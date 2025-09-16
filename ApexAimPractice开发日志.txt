@@ -1,0 +1,305 @@
+2025
+7.13
+达成目标：
+完成了角色的移动，奔跑，跳跃，以及空中变向（需要设置CharacterComponent中的AirControlPower为0.8，原来的值为0.05）
+
+学习内容：
+重要搞清楚了InputAction中的Input Trigger和在BindAction中使用的枚举类ETriggerEvent的关系：
+Input Trigger (输入触发器)
+
+是什么： 定义如何检测输入（如“按下时触发”、“长按2秒触发”、“摇杆移动超过阈值触发”）。
+
+输出： 每帧计算并输出一个 EInputTriggerState (None, Triggered, Ongoing)。
+
+例子： Pressed, Released, Hold, Tap, Axis 等。
+
+作用： 规则制定者。它告诉输入系统：“当用户的输入满足 我 设定的规则时，就给关联的Input Action标记相应的状态”。
+
+ETriggerEvent (绑定事件类型)
+
+是什么： 定义何时调用您绑定的函数（回调）。它表示Input Action的最终状态变化事件。
+
+在哪里设置： 在 BindAction() 函数调用时指定。
+
+输入： 接收 Input Action 的最终状态计算结果（基于其所有Input Trigger的状态组合）。
+
+枚举值： Started, Triggered, Completed, Canceled。 (Ongoing 是引擎内部状态，通常不直接绑定，deleted 可能是个笔误或旧版本残留)。
+
+作用： 事件通知者。它告诉输入系统：“当关联的Input Action发生了 这种类型 的状态变化事件时，就执行我绑定的函数”。
+
+如何使用组合按键实现奔跑功能，当前进键w按下时，按下leftshift才会触发奔跑的Action。需要使用
+
+
+
+7.15
+达成目标：
+完成了角色的疲劳跳跃功能，角色在跳跃过后，跳跃高度会减小到原来的1/2，跳跃高度会随着时间的流逝而渐渐恢复。每次跳跃都要根据距离角色上一次跳跃过去的时间来计算比例，算出此次跳跃的高度。跳跃完全恢复的时间为2s。
+
+学习内容：
+定时器的使用
+
+目标具体内容：
+//计算比例并且限制在一定范围内
+float JumpRate = FMath::Clamp(LastedJumpTilNow / JumpRecoveryTime, 0.5, 1);
+//设置此次跳跃的速度
+GetCharacterMovement()->JumpZVelocity = MaxJumpSpeed * JumpRate;
+//执行跳跃
+ACharacter::Jump();
+//设置定时器：每帧更新一次，持续JumpRecoveryTime秒
+LastedJumpTilNow = 0;
+GetWorld()->GetTimerManager().SetTimer(
+	JumpTimerHandle,
+	[this]()
+	{
+		LastedJumpTilNow += GetWorld()->GetDeltaSeconds();
+
+		//在达到JumpRecoveryTime秒后停止计时
+		if (LastedJumpTilNow >= JumpRecoveryTime)
+		{
+			GetWorld()->GetTimerManager().ClearTimer(JumpTimerHandle);
+			LastedJumpTilNow = JumpRecoveryTime;
+		}
+	},
+	0.01f, // 每帧执行（实际使用delta seconds）
+	true   // 循环执行
+);
+
+
+
+7.16
+达成目标：0
+学习内容：
+UE动画混合空间的学习与使用，骨骼根运动调试，从mixamo上面导入的模型骨骼没有根，由于根在盆骨的位置，所以当禁用根运动后动画显得非常奇怪，我考虑重新更换骨骼模型资源，并且使用资源商店的动画看看。
+
+
+
+8.1
+达成目标：
+学习内容：
+理清了UE中角色控制相关的类的职责：
+PlayerController：
+（1）挂载输入映射获取LocalPlayer的Subsystem后AddMappingContext
+（2）绑定输入事件在SetupInputComponent方法中，调用传递输入给Character类的方法
+（3）创建传递输入给Character类的方法，调用Character类中角色具体操作的逻辑方法
+Character：
+（1）实现相关输入对应的角色响应逻辑
+
+8.24
+达成目标：完成了武器的初始化，以及装备武器方法，将其挂载到手臂mesh
+学习内容：
+
+
+8.25
+达成目标：仿照unity自定义了一个对象池系统（继承自Actor）
+学习内容：
+UE中的接口以及多播委托，UWorld的职责
+
+8.26
+达成目标：武器动画的播放，角色手臂随武器后坐力的动画播放，武器特效的播放
+学习内容：
+UClass和UClassComponent的区别（举例子USkeletalMesh / USkeletalMeshComponent）
+USkeletalMesh是骨骼网格资产，USkeletalMeshComponent是负责播放动画的组件。
+UE中有很多类似的类，这是“资产-组件”模式，如何记忆他们的区别？
+是在编辑时配置（Asset）还是在运行时动态生成和操作（Component）？
+
+我在使用IsValid(MuzzleFlash)的时候发生类型不能转换的问题，但是IsValid(WeaponShootingSound)却没有问题，这是什么原因？
+TObjectPtr<UParticleSystem> MuzzleFlash;
+TObjectPtr<USoundBase> WeaponShootingSound;
+全局的 IsValid 函数有几个重载版本，其中最相关的两个是：
+bool IsValid(const UObject* Object)
+bool IsValid(const TObjectPtr<UObject>& Object) (或类似的 TObjectPtr 重载)
+在引擎的头文件中可能包含了TObjectPtr<USoundBase> 定义了到 TObjectPtr<UObject> 的隐式转换运算符，而UParticleSystem可能没有定义同样的隐式转换所以发生了错误。
+最佳实践：无论何时都使用IsVaild( TObjectPtr<UClass>.Get() )，TObjectPtr包含的Get()方法返回原始指针
+
+出现问题：
+在播放角色手臂动画的时候，在角色类获取武器的手臂动画蒙太奇时发生崩溃。
+armsShootingMontage = ActiveWeapon->ArmsShootingMontage;
+但是在角色类中的Fire函数已经检查过ActiveWeapon是否有效，疑问？
+测试发现不是ActiveWeapon的问题，而是WeaponBase中的WeaponOwner没有检查其是否有效，这个指针在角色类中的EquipWeapon方法中应该有指定指向的对象。经过检查发现，我最开始定义WeaponOwner的名称为Owner，而Owner与Actor中同样定义的相同名称冲突了，我在更改其名称为WeaponOwner的时候未将角色类中的EquipWeapon方法中的名称一起更改，导致错误。我记得我是右键重命名的，这是因为与Actor中命名冲突的问题所以没有全部更改掉吗？不纠结
+
+8.27
+达成目标：武器音效和枪口闪光挂载，准星UI制作
+学习内容：
+FPS游戏中的射击系统：（以Apex为例）
+视觉表现和实际逻辑区分开来，视觉表现使用弹道修正，实际逻辑使用射线检测还是实体物理模拟呢？
+使用射线检测，碰撞体每帧模拟在大型多人竞技射击游戏中太过消耗性能。
+
+8.28
+达成目标：射线物理模拟初步完成
+学习内容：
+Unity的协程计时和UE的计时器Timer的底层：
+都会阻塞主线程，引擎每帧会调用管理器，管理器会获取自上一帧到当前帧所经过的时间（DeltaTime），然后用这个时间差去递减每个注册的协程/计时器的“剩余时间”。检查更新后的剩余时间是否小于零，触发回调。
+
+大型多人在线射击游戏系统理清：
+子弹逻辑仍然使用射线检测，通过物理模拟弹道在短时间内得到结果，同时服务器还会选择性的预测可能击中的敌人运动趋势。由于我的游戏是一个本地的练枪游戏，就不再做敌人运动趋势的模拟了，实时击中。（可能会产生问题，视觉与逻辑命中不同步），射线物理模拟完成后，需要进行视觉上的匹配，ai最开始说的使用UCurveVector曲线，但是我发现它应该是不能完全匹配射线物理模拟弹道的。于是思考了一个办法，使用一个TArray记录射线模拟的每一个点，然后让网格体根据这个数据来进行模拟。但是，出现一个问题，子弹是从枪口初始化的，如果直接使用该数组，可能会出现子弹往相机处飞然后再向前飞的情况。此问题尚未得到解决。
+
+
+8.29
+达成目标：
+射线物理模拟与子弹网格体的视觉匹配，子弹发射函数定义，增加武器类传递给子弹类的信息（FHitResult，是否击中物体），子弹类回调武器类函数（实行加血扣血等），划分渲染特效职责给子弹类，逻辑操作职责给武器类的回调函数。
+
+学习内容：
+碰撞检测的原理
+昨天出现的问题解决办法：射线物理检测的第一次检测直接在摄像机的位置和摄像机前一米处（可能还要进行延长）进行，然后进行物理模拟，此时弹道轨迹点数组的第一个点就是摄像机前一米处，子弹初始化在枪口，直接进行匹配。
+
+思考：
+在Apex中，时常会出现子弹击中敌人并且也触发了命中特效和音效，但是却没有造成伤害的问题，这应该是由于网络延迟导致的，说明客户端也会对子弹进行射线的物理模拟，并且可能也存在对敌人移动趋势的预测，然后进行视觉上的反馈。服务器端也会根据客户端传输的操作再次进行模拟并且将结果返回给客户端，进行校验后，客户端才渲染对敌人造成伤害时的血条显示与伤害数字显示。
+
+
+9.2
+达成目标：
+使用cpp定义了可以被击中物体的接口
+
+学习内容：
+蓝图接口。cpp接口。实现BlueprintNativeEvent，需要再另外创建一个与 BlueprintNativeEvent 同名的函数，并在名称后加上 _Implementation 后缀。要在C++中从 Blueprintable 接口安全调用的 BlueprintImplementableEvent 或 BlueprintNativeEvent，必须使用特殊的静态 Execute_ 函数封装器。
+
+疑问：
+通过子弹网格体销毁的时刻来告诉武器类子弹击中是否合理？
+
+
+9.6
+达成目标:
+射击合法性检验(弹夹容量，射击频率)
+学习内容：
+
+
+9.7
+达成目标：
+增加了瞄准输入操作，修改了对象池的父类，修改了射线检测的碰撞检测忽略频道（新增了持有武器的角色本身），武器类中添加了被装备和被丢弃的函数（用来绑定与解绑碰撞忽略频道的角色）。
+
+学习内容：
+场景层级关系AttachToActor和逻辑关系SetOwner
+UObject不持有世界的引用，Actor持有所属世界的引用
+当UObject执行与世界有关的操作时，需要使用GEngine->GetWorldFromContextObject(this)，此时引擎会通过对象的Outer链找到一个有效的世界上下文，Outer在NewObject<class>(outer)创建UObject对象时会指定。
+
+出现问题：
+1、
+Exhausted all retries!
+不能使用IsVaild()判断一个不是UObject*的指针，而我使用了IsVaild判断子弹类TSubClassOf。
+删除相关的判断代码后仍然出现该错误，在IDE中清理项目重新生成也不行，必须在文件夹中删除Intermediate和Binaries文件夹重新生成VS项目才可以。
+2、
+对象池在初始化的时候在MyObjectPool.cpp：PooledObjectClass = ActorClass; 发生崩溃
+测试后发现是武器对象池本体指针为空，我在构造函数中使用
+ProjectileObjectPool = CreateDefaultSubobject<AMyObjectPool>("ProjectileObjectPool");
+ProjectileObjectPool->SetOwner(Cast<AActor>( RootComponent));//question
+这两条语句初始化武器的子弹对象池会导致对象池指针为空。对象池继承自AActor而不是一个UActorComponent。CreateDefaultSubobject<>() 是用于创建组件(Component)的。应该在BeginPlay函数中生成SpawnActor。
+
+思考：
+1、既然对象池本身不作为一个场景中的实体，那么对象池可以不需要继承自Actor，将其继承自UObject。
+2、在武器的射线检测中，需要添加忽略的碰撞对象，比如武器和持有武器的角色，通常来说，武器类肯定要忽略武器本身的碰撞，但是，持有该武器的角色却有可能会变化，那么我应该怎么设计呢？角色可能会死亡，然后忽略数组就会持有一个空引用，那么我应该使用TArray<TWeakObjectPtr<AActor>>。如果是角色类主动丢弃该武器呢？我该怎么调整忽略数组呢？在武器类中让这个TArray对外开放，然后在角色装备武器和丢弃武器的函数中调用该TArray的指针将其置为空？那我要怎么知道哪个指针是指向我的角色的呢？
+
+
+9.8
+达成目标：
+武器垂直和水平后座力的开发。射线物理检测和子弹网格体视觉匹配完成。
+
+学习内容：
+
+出现问题：
+已解决：
+1、
+在子弹网格体进行视觉匹配的时候，在最后一刻游戏会发生崩溃。根据崩溃报告发现是数组越界了，进行子弹轨迹点数组的访问在最后一刻越界。在限制_currentPathIndex时，不光是数组序号本身要减一，飞行段数本来也要比数组的数量少一，所以Clamp方法的最大值应该是segmentNum - 2。
+2、
+子弹在连续射击一段时间后直接销毁了？场景中无法找到Actor。回调函数OnTargetReach中使用了Destory，事实上我们使用的是子弹对象池回收，将Destory删除即可。
+3、
+在射线检测没有击中物体时，子弹会直接初始化留在原地而不是发射出去。经过测试发现子弹计时器部署失败。经过测试发现传入的限定时间为0。经过寻找发现在射线检测物理模拟函数中，子弹未击中物体时，没有传出子弹飞行时间。
+未解决：
+1、子弹似乎还是从摄像机射出的，没有从muzzleposition射出
+
+思考：
+为了让子弹网格体与射线物理模拟进行视觉匹配，使用了计时器来使子弹在到达飞行时间后自动销毁。但是如果场景中有大量角色进行大量射击，每个子弹都带有一个计时器，会产生大量计时器，虽然使用了子弹对象池，但是这会不会导致一些问题？
+
+
+9.9
+达成目标：
+武器腰射圆锥形随机散布完成，使用FMath::VRandCone。子弹尾迹实时更新完成，但是仍需完善。
+
+
+9.10
+达成目标：
+敌人基类完成。伤害系统完成（根据不同身体部位造成不同伤害）。音效系统雏形完成。
+
+学习内容：
+1、在传递结构体变量时，最好使用传引用的方式(const FVector&)进行传递，这样子就不会使用值传递进行副本的拷贝了，减少函数栈帧的消耗。
+2、将要被委托绑定的函数必须添加UFUNTION()。
+3、UE中的GameInstanceSubsystem是当前最推荐作为一个全局单例管理器的父类。它在编译后就被注册到了引擎的反射系统中，引擎知道它的存在。它有一个机制叫惰性实例化，跟我在Unity中自制的单例管理器一样，在第一次调用的时候，引擎的子系统管理器会检查当前的GameInstance下是否存在一个名为你调用的类名的实例，如果不存在，引擎会在内存中创建一个实例然后调用Initialize()函数。如果已经存在，则直接返回那个现有实例的指针。
+
+问题：
+1、如何创建一个全局单例管理器？GameInstanceSubsystem，伴随着整个游戏进程。
+2、如何创建一个不同生命周期的单例管理器？WorldSubsystem，随着世界的生命周期。
+3、如何把伤害应用和音效视觉反馈解耦合？击中头部和击中护甲、血量的声音都不同，命中头部的声音会覆盖任何其他的声音。
+4、音频管理器中，需要定义大量成员变量来存储不同的音频，这样似乎不太好，虽然存储的是指针？修改与添加非常麻烦，使用数据表存储音频，可以在外部进行简单的修改即可。
+
+思考：
+1、子弹网格体在到达目标时，通知武器类，传递是否击中和击中信息。是由武器类直接造成伤害，还是再让其通知持有武器的角色类让其造成伤害呢？两个设计的区别是什么？武器类拥有伤害，并且还有不同的爆头倍率，在武器类中判断击中的部位并且计算将要造成的伤害肯定是最优解。让武器类计算将要造成的伤害然后传递给持有武器的角色再让其实施？这样设计的意义是什么？同时，我想到跨游戏实例进行指针调用对性能的影响，和直接在自身的函数内部执行参数修改的区别与本质。
+
+方案一
+优点：
+高内聚：所有与“造成伤害”相关的逻辑（如部位判定、伤害衰减、武器特效触发）都集中在武器类内部。武器是一个自包含的、功能完整的模块。
+易于扩展：添加新武器（如狙击枪、霰弹枪、火箭筒）时，每种武器都可以有自己的CalculateDamage实现，非常灵活，不需要修改角色代码。
+缺点：
+破坏封装性/产生循环依赖：这是你最担心的一点。武器需要知道主人的接口（如OnWeaponCausedDamage），以便回调通知。这就在Weapon和Character类之间形成了双向依赖。虽然可以通过接口（如IDamageDealerSource）来降低耦合，但依赖关系依然存在。
+职责模糊：从高层架构看，“造成伤害”这个行为究竟是角色的行为还是武器的行为？理论上，武器是角色使用的工具，行为的执行主体应该是角色。
+
+显然，方案二会更好一点。
+更好的封装性和职责清晰：角色是行为的执行者，武器是工具。角色完全掌控了“造成伤害”这一重要游戏行为，所有统计数据的管理自然且集中。
+降低耦合：Weapon类不需要知道主人的具体实现，它只需要定义一个委托或调用一个简单的接口方法来传递FWeaponHitInfo。Weapon可以更容易地被其他类型的Actor（如载具、AI实体）复用。
+
+
+9.11
+达成目标：
+音效系统完善（不同身体部位不同伤害音效）。射击不同身体部位应用不同伤害。
+
+学习内容：
+单播委托和多播委托，多播可以绑定多个函数。动态委托通过UE的反射系统来查找函数，性能较低但可以被蓝图调用。
+
+问题：
+1、在音效系统中，我们使用数据表存储音频，在使用音频前需要到数据表进行查找，这样的频繁查找会不会影响性能？不会，量级太小了。如果真要优化查找效率，可以将音频缓存到TMap，即哈希表中。
+2、在什么地方播放碎甲和击杀敌人的音效呢？如果是联机游戏，他人死亡的音效会单独领出来作为一个空间音效。不用纠结，如果是联机游戏，敌人状态变化会作为一个多播委托，当事件发生时，服务器会发射RPC给客户端，客户端根据碎甲事件的造成者是否是自己或者是他人来决定播放2D还是3D音效。我在EnemyCharacter中定义委托，并且新增两个成员事件碎甲和死亡，在敌人初始化的时候就获取soundmanager单例并且将其播放碎甲和死亡的音效函数绑定给这两个事件。
+3、击杀音效和爆头击杀音效该怎么做？或许应该将击杀音效和死亡音效区分开来，死亡音效绑定在角色死亡的事件中，击杀音效则在子弹击中敌人播放的音效中实现。但是我要怎么让子弹知道我这次射击击杀了敌人呢？又是否击中敌人头部呢？我发现我的代码结构似乎已经有点乱了，我为了延迟伤害的造成来模拟真实，通过子弹网格体击中目标时通知武器类，武器类通过命中信息计算好伤害后，再将伤害传递给角色类，由角色类来应用伤害到敌人身上，但是我播放子弹命中音效的函数在通知武器类前就播放了，我如果要在子弹命中音效函数中播放击杀敌人的音效，此时还没有进行伤害计算，我是无法获取到是否击杀敌人的信息的。那么，如果在敌人死亡事件中进行判断是否击中头部再播放不同的音效，则需要传递参数，敌人类需要知道是否被击中头部，那么就需要武器类传递给玩家类，玩家类在造成伤害时再进行传参。但是，玩家类使用的UE内置的ApplyPointDamage无法新增参数，其中有一个DamageType，可以自定义一个爆头伤害类型，然后将其传递广播。
+4、在获取FHitResult的物理材质时一直获取不到。结果是在进行物理模拟射线检测的时候，FCollisionQueryParams.bReturnPhysicalMaterial未启用物理材质返回。
+5、伤害计算上有点问题，打头打手臂能够正确地获取到物理材质，但是打身体却获取不到正确的物理材质。考虑到或许是骨骼网格体本身阻挡了射线对物理资产的击中，我在敌人蓝图的Mesh中搜索Collision并且调整了Preset后似乎还是没有用。我在添加了测试代码，输出FHitResult的Hit Component后发现居然是tmd敌人蓝图类的胶囊体阻挡了射线检测！我的天呐，答案近在眼前，整整花了我一个晚上的时间。我在骨骼体物理资产中翻来覆去半天，还是没有跳脱出来思维，想到问题在哪，还得练呐。
+
+思考：
+1、深度思考：子弹网格体到达目标时，再通知武器类进行伤害计算是否合理，此过程需要传递大量重复参数，并且形成了强依赖和复杂的回调链。我为什么要这么做？因为射线检测是一瞬间的过程，为了模拟真实，子弹需要飞行时间，伤害应用也实际上有延迟，于是我才这么设计。有没有办法延迟伤害的应用呢？
+
+2、FHitResult结构体中拥有BoneName这一变量，我是使用了物理材质来判断角色的击中部位的，如果使用BoneName来判断，骨骼体拥有很多骨头其实也不好判断。统一设置对应骨骼为同一物理材质，然后在击中时使用物理材质判断应该是最优解。
+
+
+9.12
+达成目标：
+敌人始终朝向玩家（水平方向）。敌人管理器注册与取消注册完成。敌人自动生成完成。敌人走位规律完成。
+
+学习内容：
+计时器复习及精通
+
+问题：
+1、使用UNavigationSystem中的方法时，编辑器遇到无法识别的外部符号。在Build.cs中添加NavigationSystem模块依赖即可。
+2、使用NavMeshBoundsVolume的时候发现没有在Landscape上生成导航网格体，经过查找发现是Landscape没有启用FillCollisionUnderLandscapeForNav，将这个设置成true以防止导航网格体生成under地形的几何形状下面。
+3、在Tick函数中，敌人蓝图执行了AddMovementInput但是不移动。经过检查发现是敌人蓝图在生成时没有Controller，所以无法左右移动，在敌人的蓝图类中找到Auto Possess AI选项将其设置为Spawned即可。
+4、敌人生成的时候悬浮在空中没有落地。将CharacterMovementComponent的SetMovementMode(MOVE_Walking)后即可解决。
+5、如何在镜像走位函数中延迟变向的调用以模拟人的反应时间？设计两个函数，一个用来启动计时器调用延迟函数体，一个延迟函数体用来变向。那么如何通过SetTimer()传递参数给延迟函数呢？使用Lambda表达式[this, moveRight](){this->DelayMirrorMove(moveRight);}捕获变量并且传递给延迟函数。
+
+
+9.13
+达成目标：敌人随机化走位规律及事件调用完成。命中提示UI完成。
+
+学习内容：
+static ConstructorHelpers::FClassFinder<class> Name(TEXT(""));FClassFinder必须用在构造函数中
+
+
+问题：
+1、如何设置UI管理器？如何传递创建好的蓝图Widget？
+2、如何在击杀敌人时播放击杀提示？如果绑定敌人死亡的事件，那么假设这是一个多人大逃杀游戏，那么每一个场上敌人死亡的时候都会提示UI。但是事实上，在射线检测和预测之后我们就能知道此次射击是否能够击杀敌人，所以最大的问题还是在，如何将逻辑计算与视觉匹配？
+3、如何获取到UI的动画并且播放？为UserWidget创建一个cpp父类，并且声明成员变量UWidgetAnimation*使用元数据Meta = (BindWidgetAnim)标注，此时在NativeConstruct()函数中就会自动寻找与成员变量名同名的动画并且绑定。在我的命中提示准星中，我使用了较为笨重的方法运行时按名称寻找，及其麻烦。
+
+
+巨大问题：在添加了UI动画获取和绑定相关播放后，编译一直失败。
+命令“"D:\Epic Games\UE_5.4\Engine\Build\BatchFiles\Build.bat" FirstPersonShootEditor Win64 Development -Project="D:\UE Projects\FirstPersonShoot\FirstPersonShoot.uproject" -WaitMutex -FromMsBuild -architecture=x64”已退出，代码为 6。
+1、在我注释了新添加的功能后，才得以重新编译。
+2、在UUIManagerSubsystem中，我通过控制以下两个变量得出结论，当注释前向声明class UWidgetAnimation并且在头文件中包含#include "Animation/WidgetAnimation.h"
+后，代码即可重新编译。
+
+问题解答：在 Unreal Engine 中，问题很可能不在于 C++ 语言本身，而在于 Unreal Header Tool (UHT) 的处理方式。UHT 是 UE 的代码生成工具，它在实际 C++ 编译之前运行，用于生成反射数据（*.generated.h 文件）。
+当 UHT 处理您的头文件时，它需要分析所有类型的使用情况，以便生成正确的反射代码。即使函数声明只是使用指针，UHT 也可能需要访问类的完整定义
+虽然函数声明本身在纯 C++ 中只需要前向声明，但 UHT 可能会分析函数签名以确定是否需要为蓝图生成暴露信息。
