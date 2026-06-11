@@ -8,7 +8,23 @@ public class FirstPersonShoot : ModuleRules
 	{
 		PCHUsage = PCHUsageMode.UseExplicitOrSharedPCHs;
 
-		PublicDependencyModuleNames.AddRange(new string[] { "Core", "CoreUObject", "Engine", 
-			"InputCore", "EnhancedInput","NavigationSystem","UMG"});
+		PublicDependencyModuleNames.AddRange(new string[] { 
+			"Core", 
+			"CoreUObject", 
+			"Engine", 
+			"InputCore", 
+			"EnhancedInput",
+			"NavigationSystem",
+			"UMG",
+			// Mass 核心模块 (5.6 已内置)
+			"MassEntity",
+			// Mass 常用碎片 (FTransformFragment 等)
+			"MassCommon", 
+			// Mass 生成系统 (Spawner)
+			"MassSpawner",
+			// Mass 视觉表现 (LOD/StaticMesh 渲染)
+			"MassRepresentation",
+            "MassLOD"
+        });
 	}
 }
