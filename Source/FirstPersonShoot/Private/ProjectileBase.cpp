@@ -91,7 +91,7 @@ void AProjectileBase::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
 
-	//更新时间与比例
+	//更新物理时间与比例
 	_elapsedTime += DeltaTime;
 	float elapasedTimePercent = _elapsedTime / _projectileFlyTime;//到了飞行时间直接销毁，所以该值小于1吗？
 

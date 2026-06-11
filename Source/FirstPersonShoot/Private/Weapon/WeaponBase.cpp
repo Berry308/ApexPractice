@@ -234,7 +234,7 @@ bool AWeaponBase::SimulatePhysicsTrajectory(
 			//命中处理(返回命中目标需要的时间，返回碰撞信息)
 			OutHitResult = hitInfo;
 			OutTimeToHit = currentTime + (hitInfo.Time * timeStep);
-			OutTrajectoryPoints.Add(hitInfo.Location);
+			OutTrajectoryPoints.Add(hitInfo.Location);//添加命中点到轨迹数组
 			if (bIsTrajectoryDraw)
 			{
 				// 绘制调试信息
