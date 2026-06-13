@@ -176,13 +176,18 @@ bool AWeaponBase::SimulatePhysicsTrajectory(
 	FHitResult& OutHitResult, float& OutTimeToHit,TArray<FVector>& OutTrajectoryPoints) const
 {
 	UE_LOG(LogTemp, Warning, TEXT("SimulatePhysicsTrajectory"));
+
+	float currentTime = 0.0f;
+	float timeStep = 0.016f;//步长代表了模拟的精度（60帧）
+
 	//初始化(要返回一个子弹飞行的时间)
 	FVector currentPosition = OriginalPosition;//OriginalPosition通常来说是相机的Location
 	FVector currentVelocity = Direction * InitialSpeed;
 	FVector gravity = FVector(0, 0, -980) * GravityScale;
 
-	float currentTime = 0.0f;
-	float timeStep = 0.016f;//步长代表了模拟的精度（60帧）
+	//应用重力
+	currentVelocity += gravity * timeStep;
+
 
 	//在起点与目标点应用球形射线检测
 	FHitResult hitInfo;
@@ -206,8 +211,7 @@ bool AWeaponBase::SimulatePhysicsTrajectory(
 			targetPosition = currentPosition + currentVelocity * timeStep;
 		}
 
-		//应用重力
-		currentVelocity += gravity * timeStep;
+
 
 		bool bhitsomething = GetWorld()->SweepSingleByChannel(
 			hitInfo,

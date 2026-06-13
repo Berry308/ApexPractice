@@ -16,7 +16,6 @@ public class FirstPersonShoot : ModuleRules
 			"EnhancedInput",
 			"NavigationSystem",
 			"UMG",
-			// Mass 核心模块 (5.6 已内置)
 			"MassEntity",
 			// Mass 常用碎片 (FTransformFragment 等)
 			"MassCommon", 

@@ -7,16 +7,15 @@
 		{
 			"Name": "FirstPersonShoot",
 			"Type": "Runtime",
-			"LoadingPhase": "Default"
+			"LoadingPhase": "Default",
+			"AdditionalDependencies": [
+				"MassEntity"
+			]
 		}
 	],
 	"Plugins": [
 		{
 			"Name": "ModelingToolsEditorMode",
-			"Enabled": true
-		},
-		{
-			"Name": "MassEntity",
 			"Enabled": true
 		},
 		{
