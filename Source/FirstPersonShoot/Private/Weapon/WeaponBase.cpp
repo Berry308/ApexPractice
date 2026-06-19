@@ -9,7 +9,13 @@
 #include "Tool/MyObjectPool.h"
 #include "Character/ThirdPersonCharacter.h"
 #include "Character/EnemyCharacter.h"
-
+#include "MassEntitySubsystem.h"
+#include "MassSpawnerSubsystem.h"
+#include "MassEntityConfigAsset.h"
+#include "MassEntityManager.h"
+#include "MassEntityTypes.h"
+#include "MassCommonFragments.h"
+#include "Mass/Bullet/BulletFragments.h"
 
 
 // Sets default values
@@ -70,7 +76,7 @@ void AWeaponBase::BeginPlay()
 	ActorToIgnore.Add(this);
 
 	//武器腰射散布调整
-	WeaponSpreadAngle /= 100;
+	WeaponMaxSpreadAngle /= 100;
 }
 
 void AWeaponBase::Tick(float DeltaTime)
@@ -185,9 +191,6 @@ bool AWeaponBase::SimulatePhysicsTrajectory(
 	FVector currentVelocity = Direction * InitialSpeed;
 	FVector gravity = FVector(0, 0, -980) * GravityScale;
 
-	//应用重力
-	currentVelocity += gravity * timeStep;
-
 
 	//在起点与目标点应用球形射线检测
 	FHitResult hitInfo;
@@ -199,6 +202,9 @@ bool AWeaponBase::SimulatePhysicsTrajectory(
 	//当子弹存活的时候进行模拟，直到击中物体
 	while (currentTime < MaxLifetime)
 	{
+		//重力叠加
+		currentVelocity += gravity * timeStep;
+
 		//首先计算出一帧中的起点和目标点
 		FVector targetPosition;
 		if (currentTime == 0.0f)
@@ -386,7 +392,7 @@ void AWeaponBase::BulletReachTarget(TObjectPtr<AProjectileBase> Bullet,bool bIsB
 	}
 }
 
-//分为开镜和腰射
+//分为开镜和腰射，射击的起点
 void AWeaponBase::TryShoot()
 {
 	UE_LOG(LogTemp, Display, TEXT("TryShoot"));
@@ -419,34 +425,35 @@ void AWeaponBase::TryShoot()
 		WeaponOwner->PlayerShootingRecoil();
 	}
 
-	//定义弹道模拟将要用到的参数
-	TObjectPtr<APlayerController> PC = Cast<APlayerController>(WeaponOwner->GetController());
-	if (!IsValid(PC.Get())) return;
+#pragma region 物理弹道模拟和射线检测，网格体根据物理模拟弹道实现视觉表现的子弹系统的实现思路
+	/*
+//定义弹道模拟将要用到的参数
+TObjectPtr<APlayerController> PC = Cast<APlayerController>(WeaponOwner->GetController());
+if (!IsValid(PC.Get())) return;
 
-	FVector CameraLocation;
-	FRotator CameraRotation;
-	PC->GetPlayerViewPoint(CameraLocation, CameraRotation);
-	FVector CameraDirection = CameraRotation.Vector();//需不需要归一化处理？
+FVector CameraLocation;
+FRotator CameraRotation;
+PC->GetPlayerViewPoint(CameraLocation, CameraRotation);
+FVector CameraDirection = CameraRotation.Vector();//需不需要归一化处理？
 
-	FHitResult hitResult;
-	hitResult.Init();
-	float TimeToHit = 0;//子弹从发射到击中的时间
-	TArray<FVector> TrajectoryPoints;
-	TrajectoryPoints.Empty();//先清空弹道轨迹点
-	bool bIsBulletHit = false;
+FHitResult hitResult;
+hitResult.Init();
+float TimeToHit = 0;//子弹从发射到击中的时间
+TArray<FVector> TrajectoryPoints;
+TrajectoryPoints.Empty();//先清空弹道轨迹点
+bool bIsBulletHit = false;
 
-	if (WeaponOwner->bIsAiming)//开镜瞄准
-	{
-		//模拟物理弹道
-		bIsBulletHit = SimulatePhysicsTrajectory(CameraLocation,
-			CameraDirection,BulletInitialSpeed,
-			BulletGravity,BulletMaxLifeTime,
-			BulletRadius,hitResult,
-			TimeToHit,TrajectoryPoints);
-
-    #pragma region TestCode
+if (WeaponOwner->bIsAiming)//开镜瞄准
+{
+	//模拟物理弹道
+	bIsBulletHit = SimulatePhysicsTrajectory(CameraLocation,
+		CameraDirection,BulletInitialSpeed,
+		BulletGravity,BulletMaxLifeTime,
+		BulletRadius,hitResult,
+		TimeToHit,TrajectoryPoints);
+#pragma region TestCode
 		//物理模拟射线检测测试代码
-		/*UE_LOG(LogTemp, Warning, TEXT("TimeToHit: %f"), TimeToHit);*/
+		//UE_LOG(LogTemp, Warning, TEXT("TimeToHit: %f"), TimeToHit);
 		//UE_LOG(LogTemp, Warning, TEXT("AfterSimulatePhysicsTrajectory:HitActor: %s"),*hitResult.GetActor()->GetName());
 		//TObjectPtr<UPhysicalMaterial> physMaterial = hitResult.PhysMaterial.Get();
 		//if (!physMaterial)
@@ -461,14 +468,13 @@ void AWeaponBase::TryShoot()
 		//UE_LOG(LogTemp, Warning, TEXT("Hit Component: %s,Hit Bone: %s, Physical Material: %s"),
 		//	*HitComponentName, *BoneName, *PhysMatName);
 #pragma endregion
-
 		//渲染子弹视觉表现，一般来说子弹击中物体的反馈特效由物体来决定，也就是说每个可以被击中的物体都附带有可以供外部调用的特效
-		PlayProjectileLaunch(CameraRotation,TrajectoryPoints,TimeToHit,hitResult,bIsBulletHit);
+		PlayProjectileLaunch(CameraRotation, TrajectoryPoints, TimeToHit, hitResult, bIsBulletHit);
 	}
 	else//腰射
 	{
 		FVector shootdirection;
-		shootdirection = FMath::VRandCone(CameraDirection, WeaponSpreadAngle);//圆锥体内散布
+		shootdirection = FMath::VRandCone(CameraDirection, WeaponMaxSpreadAngle);//圆锥体内散布
 		bIsBulletHit = SimulatePhysicsTrajectory(
 			CameraLocation, shootdirection,
 			BulletInitialSpeed, BulletGravity,
@@ -477,9 +483,65 @@ void AWeaponBase::TryShoot()
 		);
 		//渲染子弹视觉表现
 		PlayProjectileLaunch(CameraRotation, TrajectoryPoints, TimeToHit, hitResult, bIsBulletHit);
+	}*/
+#pragma endregion
 
+#pragma region 使用MassEntity实现的子弹系统
+	UWorld* World = GetWorld();
+	UMassSpawnerSubsystem* SpawnerSubsystem = UWorld::GetSubsystem<UMassSpawnerSubsystem>(World);
+	if (!SpawnerSubsystem || !BulletMassConfig) return;
+
+	// 1. 获取该配置对应的模板
+	FMassEntityTemplate Template = BulletMassConfig->GetConfig().GetOrCreateEntityTemplate(*World);
+
+	// 2. 生成实体
+	TArray<FMassEntityHandle> OutEntities;
+	SpawnerSubsystem->SpawnEntities(Template, 1, OutEntities);
+
+	// 3. 初始化数据
+	UMassEntitySubsystem* MassSubsystem = UWorld::GetSubsystem<UMassEntitySubsystem>(World);
+	check(MassSubsystem);
+	FMassEntityManager& EntityManager = MassSubsystem->GetMutableEntityManager();
+
+	for (FMassEntityHandle Entity : OutEntities)
+	{
+		TObjectPtr<APlayerController> PC = Cast<APlayerController>(WeaponOwner->GetController());
+		check(PC);
+		FVector CameraLocation;
+		FRotator CameraRotation;
+		PC->GetPlayerViewPoint(CameraLocation, CameraRotation);
+		//腰射散布调整
+		FVector ShootDirection;
+		if (WeaponOwner->bIsAiming == false)
+		{
+			ShootDirection = FMath::VRandCone(CameraRotation.Vector(), WeaponMaxSpreadAngle);
+		}
+		else
+		{
+			ShootDirection = CameraRotation.Vector();
+		}
+		//初始化BulletSimulationFragment：Gravity、Velocity、子弹半径、子弹伤害、子弹最大生存时间
+		if (FBulletSimulationFragment* Sim = EntityManager.GetFragmentDataPtr<FBulletSimulationFragment>(Entity))
+		{
+			Sim->Velocity = ShootDirection * BulletInitialSpeed;
+			Sim->CollisionRadius = BulletRadius;
+			Sim->Gravity = FVector(0, 0, -980) * BulletGravity;
+			Sim->RemainingLifeTime = BulletMaxLifeTime;
+			Sim->Damage = WeaponDamage;
+		}
+		// 初始化计时器ChunkFragment为模拟步长
+		if(FBulletSimTimerChunkFragment* Timer = EntityManager.GetFragmentDataPtr<FBulletSimTimerChunkFragment>(Entity))
+		{
+			Timer->TimeAccumulator = 0.032f;//30hz模拟
+		}
+		// 初始化子弹画面表现
+		if (FTransformFragment* TF = EntityManager.GetFragmentDataPtr<FTransformFragment>(Entity))
+		{
+			TF->GetMutableTransform().SetLocation(GetActorLocation());
+			TF->GetMutableTransform().SetRotation(GetActorRotation().Quaternion());
+		}
 	}
-	
+#pragma endregion
 }
 
 

@@ -23,12 +23,17 @@ void UBulletHitProcessor::ConfigureQueries(const TSharedRef<FMassEntityManager>&
 
 void UBulletHitProcessor::Execute(FMassEntityManager& EntityManager, FMassExecutionContext& Context)
 {
-    EntityQuery.ForEachEntityChunk(EntityManager, Context, [this](FMassExecutionContext& IterContext)
-        {
-            auto Hits = IterContext.GetFragmentView<FBulletHitFragment>();
+    EntityQuery.ForEachEntityChunk(EntityManager, Context, 
+        [this](FMassExecutionContext& IterContext){
+            auto Hits = IterContext.GetMutableFragmentView<FBulletHitFragment>();
 
             for (int32 i = 0; i < IterContext.GetNumEntities(); ++i)
             {
+				Hits[i].DamageTimer += IterContext.GetDeltaTimeSeconds();
+                if(Hits[i].DamageTimer <= Hits[i].TimeToApplyDamage) //注意这里使用<=是因为在检测到的碰撞物体那一帧，DamageTimer应该是0
+                {
+                    continue;
+				}
                 AActor* Target = Hits[i].TargetActor.Get();
                 if (Target)
                 {
@@ -39,5 +44,6 @@ void UBulletHitProcessor::Execute(FMassEntityManager& EntityManager, FMassExecut
                 // 处理完后销毁子弹实体
                 IterContext.Defer().DestroyEntity(IterContext.GetEntity(i));
             }
-        });
+        }
+    );
 }

@@ -31,6 +31,7 @@ class UAnimMontage;
 class USoundBase;
 class UParticleSystem;
 class UMyObjectPool;
+class UMassEntityConfigAsset;
 
 class AThirdPersonCharacter;
 class AProjectileBase;
@@ -70,16 +71,15 @@ public:
 	UPROPERTY(EditAnywhere, Category = "WeaponProperty")
 	float BulletGravity;//子弹的下坠
 
+	/** 武器腰射散布的最大角度的cos值*/
 	UPROPERTY(EditAnywhere, Category = "WeaponProperty")
-	float WeaponSpreadAngle;//武器腰射散布
+	float WeaponMaxSpreadAngle;
 
 	UPROPERTY(EditAnywhere, Category = "WeaponProperty")
 	TObjectPtr<UCurveFloat> VerticalRecoilCurve;//垂直后座力曲线
 
 	UPROPERTY(EditAnywhere, Category = "WeaponProperty")
 	TObjectPtr<UCurveFloat> HorizontalRecoilCurve;//水平后座力曲线
-	
-
 
 #pragma endregion
 
@@ -103,6 +103,9 @@ public:
 
 	UPROPERTY(EditAnywhere)
 	TObjectPtr<UParticleSystem> MuzzleFlash;
+
+	UPROPERTY(EditAnywhere)
+	TObjectPtr<UMassEntityConfigAsset> BulletMassConfig;
 
 	UPROPERTY(EditAnywhere)
 	TSubclassOf<UDamageType> HeadShotDamage;
