@@ -32,18 +32,13 @@ void UBulletVisionProcessor::Execute(FMassEntityManager& EntityManager, FMassExe
 
             for (int32 i = 0; i < IterContext.GetNumEntities(); ++i)
             {
-				// 1. 推进插值进度（插值进度由FBulletSimTimerChunkFragment控制，确保与模拟更新频率一致）
-                //Interps[i].TimeSinceLastSim += DeltaTime;
-                
+                // 计算 Alpha (0.0 到 1.0)，子弹飞行计算以30hz进行
+                float Alpha = FMath::Clamp(DeltaTime / 0.032, 0.0f, 1.0f);
 
-
-                // 2. 计算 Alpha (0.0 到 1.0)
-                float Alpha = FMath::Clamp(Interps[i].TimeSinceLastSim / Interps[i].SimStepDuration, 0.0f, 1.0f);
-
-                // 3. 计算当前的视觉平滑位置
+				// 计算当前的视觉平滑位置，当前位置和目标位置之间进行线性插值
                 FVector SmoothPos = FMath::Lerp(Transforms[i].GetTransform().GetLocation(), Interps[i].TargetLocation, Alpha);
 
-                // 4. 更新 Transform (ISM 渲染器会自动读取这个值)
+                // 更新 Transform (ISM 渲染器会自动读取这个值)
                 Transforms[i].GetMutableTransform().SetLocation(SmoothPos);
             }
         }

@@ -18,12 +18,10 @@ UBulletSimulationProcessor::UBulletSimulationProcessor()
 
 void UBulletSimulationProcessor::ConfigureQueries(const TSharedRef<FMassEntityManager>& EntityManager)
 {
-    EntityQuery.AddRequirement<FTransformFragment>(EMassFragmentAccess::ReadWrite);
+    //EntityQuery.AddRequirement<FBulletHitFragment>(EMassFragmentAccess::ReadWrite);
     EntityQuery.AddRequirement<FBulletSimulationFragment>(EMassFragmentAccess::ReadWrite);
-    EntityQuery.AddRequirement<FBulletHitFragment>(EMassFragmentAccess::ReadWrite);
 	EntityQuery.AddRequirement<FBulletVisionFragment>(EMassFragmentAccess::ReadWrite);
-	//不具有FBulletHitTag标签的实体才能被BulletHitProcessor处理
-    EntityQuery.AddTagRequirement<FBulletHitTag>(EMassFragmentPresence::None);
+    EntityQuery.AddTagRequirement<FBulletHitTag>(EMassFragmentPresence::None);//不具有FBulletHitTag标签的实体才能被BulletHitProcessor处理
 }
 
 void UBulletSimulationProcessor::Execute(FMassEntityManager& EntityManager, FMassExecutionContext& Context)
@@ -31,12 +29,7 @@ void UBulletSimulationProcessor::Execute(FMassEntityManager& EntityManager, FMas
     EntityQuery.ForEachEntityChunk(EntityManager, Context,
         [this](FMassExecutionContext& IterContext)
         {
-            auto Transforms = IterContext.GetMutableFragmentView<FTransformFragment>();
-            auto Sims = IterContext.GetMutableFragmentView<FBulletSimulationFragment>();
-            auto Hits = IterContext.GetMutableFragmentView<FBulletHitFragment>();
-			auto Visions = IterContext.GetMutableFragmentView<FBulletVisionFragment>();
-
-            //*控制模拟精度
+            //控制模拟精度
             const float WorldDeltaTime = IterContext.GetDeltaTimeSeconds();
 			const float TargetInterval = 0.032f; // 30Hz的检测频率
             // 获取该块的计时器
@@ -47,42 +40,59 @@ void UBulletSimulationProcessor::Execute(FMassEntityManager& EntityManager, FMas
             {
                 return;
             }
+
+            auto Sims = IterContext.GetMutableFragmentView<FBulletSimulationFragment>();
+            auto Visions = IterContext.GetMutableFragmentView<FBulletVisionFragment>();
+            //auto Hits = IterContext.GetMutableFragmentView<FBulletHitFragment>();
+
             //重置该块的模拟计时器
 			Timer.TimeAccumulator = 0.0f;
 
 			//*遍历块内实体，更新每个子弹的模拟逻辑
             for (int32 i = 0; i < IterContext.GetNumEntities(); ++i)
             {
+                //判断子弹剩余存活时间
+                if (Sims[i].RemainingLifeTime <= 0.0f)
+                {
+					IterContext.Defer().DestroyEntity(IterContext.GetEntity(i));//如果子弹存活时间耗尽，销毁实体
+                    continue;
+                }
 				//根据当前速度、方向和重力计算子弹的下一个位置
-				FVector Start = ;
-				Sims[i].Velocity += Sims[i].Gravity * IterContext.GetDeltaTimeSeconds();//在当前速度基础上叠加重力影响
-                FVector End = Start + (Sims[i].Velocity * IterContext.GetDeltaTimeSeconds());
+				FVector Start = Sims[i].CurrentLocation;
+				FVector Velocity = Sims[i].Velocity + Sims[i].Gravity * IterContext.GetDeltaTimeSeconds();//在当前速度基础上叠加重力影响
+                FVector End = Start + (Velocity * IterContext.GetDeltaTimeSeconds());
 
-				// 扫描检测，如果命中，记录命中信息并打上Tag
+				Sims[i].RemainingLifeTime -= IterContext.GetDeltaTimeSeconds();//减少子弹剩余存活时间
+				Sims[i].Velocity = Velocity;//更新子弹速度
+				Sims[i].CurrentLocation = End;//更新子弹位置
+
+				// 扫描检测，如果命中，打上Tag并添加HitFragment
                 FHitResult HitResult;
                 if (GetWorld()->SweepSingleByChannel(HitResult, 
                     Start, End,
                     FQuat::Identity, ECC_GameTraceChannel1, 
                     FCollisionShape::MakeSphere(Sims[i].CollisionRadius)))
                 {
-                    //记录命中信息
-                    Hits[i].TargetActor = HitResult.GetActor();
-                    Hits[i].HitLocation = HitResult.ImpactPoint;
+                    //更新视觉片段的目标位置为命中点
+                    Visions[i].TargetLocation = HitResult.ImpactPoint;
                     //计算从模拟起点到命中的时间
 					float TotalDis = (End - Start).Size();//如果未命中物体理论上移动的距离
 					float MoveDis = (HitResult.ImpactPoint - Start).Size();
 					float TimeToHit = FMath::Clamp(MoveDis / TotalDis, 0.0f, 1.0f);
-					Hits[i].TimeToApplyDamage = TimeToHit;
-                    //给实体打上 Tag，交给BulletHitProcessor 处理
+					FBulletHitFragment HitFragment;
+					HitFragment.InstigatorActor = Sims[i].InstigatorActor;
+                    HitFragment.TimeToApplyDamage = TimeToHit;
+                    HitFragment.TargetActor = HitResult.GetActor();
+                    HitFragment.HitLocation = HitResult.ImpactPoint;
+
+                    //给实体打上Tag并添加HitFragment，交给BulletHitProcessor 处理，注意当前帧不会立马添加FBulletHitTag给相应实体，即后续不会立马执行HitProcessor
                     IterContext.Defer().AddTag<FBulletHitTag>(IterContext.GetEntity(i));
-					//更新视觉片段的目标位置为命中点
-					Visions[i].TargetLocation = HitResult.ImpactPoint;
+					IterContext.Defer().PushCommand<FMassCommandAddFragmentInstances>(IterContext.GetEntity(i),HitFragment);
                 }
                 else//如果没有命中
                 {
 					Visions[i].TargetLocation = End;
                 }
-                //*Transforms[i].GetMutableTransform().SetLocation(End);
             }
         }
     );

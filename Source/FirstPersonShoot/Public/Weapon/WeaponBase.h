@@ -169,4 +169,6 @@ protected:
 		const FHitResult& HitResult, bool bIsHit);
 
 	float CalculateDamage(TObjectPtr<UPhysicalMaterial> PhysicalMaterial);
+
+	void MassBulletShoot();
 };

@@ -15,10 +15,15 @@ struct FBulletSimulationFragment : public FMassFragment
 {
     GENERATED_BODY()
 
-    //下坠速度
+    // 射击发起者
+    UPROPERTY()
+    TWeakObjectPtr<AActor> InstigatorActor;
+    //子弹当前位置
+	FVector CurrentLocation;
+    //下坠速度向量
     UPROPERTY()
 	FVector Gravity;
-    //飞行方向
+    //当前速度向量
 	UPROPERTY()
 	FVector Velocity;
     //该子弹的伤害
@@ -39,8 +44,6 @@ struct FBulletVisionFragment : public FMassFragment
     GENERATED_BODY()
 
     UPROPERTY()
-    FVector PrevLocation;
-    UPROPERTY()
     FVector TargetLocation;
 
     //float TimeSinceLastSim = 0.0f; // 距离上次模拟逻辑更新经过的时间
@@ -54,7 +57,10 @@ struct FBulletHitFragment : public FMassFragment
     GENERATED_BODY()
 
     UPROPERTY()
-    TWeakObjectPtr<AActor> TargetActor; // 使用弱指针防止引用悬挂
+	TWeakObjectPtr<AActor> InstigatorActor; // 射击发起者
+
+    UPROPERTY()
+    TWeakObjectPtr<AActor> TargetActor; // 射击命中物
 
     UPROPERTY()
 	float DamageTimer = 0; // 应用命中时间计时器
@@ -72,7 +78,7 @@ struct FBulletSimTimerChunkFragment : public FMassChunkFragment
 {
 	//注：第一次执行时需要初始化该值为设定的模拟步长，以确保第一帧就能执行模拟逻辑更新
     GENERATED_BODY()
-    float TimeAccumulator = 0.0f;
+    float TimeAccumulator = 0.032f;
 };
 
 // 子弹标识标签（无数据，仅用于过滤命中的子弹实体）

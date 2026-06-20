@@ -11,7 +11,6 @@ void UBulletTrait::BuildTemplate(FMassEntityTemplateBuildContext& BuildContext, 
 {
 	BuildContext.AddFragment<FTransformFragment>();
 	BuildContext.AddFragment<FBulletSimulationFragment>();
-	BuildContext.AddFragment<FBulletHitFragment>();
 	BuildContext.AddFragment<FBulletVisionFragment>();
 	BuildContext.AddChunkFragment<FBulletSimTimerChunkFragment>();
 }

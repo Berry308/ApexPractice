@@ -30,7 +30,7 @@ void UBulletHitProcessor::Execute(FMassEntityManager& EntityManager, FMassExecut
             for (int32 i = 0; i < IterContext.GetNumEntities(); ++i)
             {
 				Hits[i].DamageTimer += IterContext.GetDeltaTimeSeconds();
-                if(Hits[i].DamageTimer <= Hits[i].TimeToApplyDamage) //注意这里使用<=是因为在检测到的碰撞物体那一帧，DamageTimer应该是0
+                if(Hits[i].DamageTimer < Hits[i].TimeToApplyDamage)
                 {
                     continue;
 				}
