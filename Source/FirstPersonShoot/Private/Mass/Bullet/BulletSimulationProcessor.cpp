@@ -88,7 +88,7 @@ void UBulletSimulationProcessor::Execute(FMassEntityManager& EntityManager, FMas
                     //计算从模拟起点到命中的时间
 					float TotalDis = (End - Start).Size();//如果未命中物体理论上移动的距离
 					float MoveDis = (HitResult.ImpactPoint - Start).Size();
-					float TimeToHit = FMath::Clamp(MoveDis / TotalDis, 0.0f, 1.0f);
+					float TimeToHit = FMath::Clamp(MoveDis / TotalDis, 0.0f, 1.0f) * IterContext.GetDeltaTimeSeconds();
 					FBulletHitFragment HitFragment;
 					HitFragment.InstigatorActor = Sims[i].InstigatorActor;
                     HitFragment.TimeToApplyDamage = TimeToHit;
