@@ -13,22 +13,26 @@ UBulletSimulationProcessor::UBulletSimulationProcessor()
     // 关键点：如果你的伤害逻辑涉及调用 Actor 函数（TakeDamage），
     // 建议开启此项以确保在主线程运行，或者在执行时进行线程安全检查。
     //bRequiresGameThreadExecution = true;
+    RegisterQuery(EntityQuery);
 }
 
 
 void UBulletSimulationProcessor::ConfigureQueries(const TSharedRef<FMassEntityManager>& EntityManager)
 {
+	EntityQuery.RegisterWithProcessor(*this);
     //EntityQuery.AddRequirement<FBulletHitFragment>(EMassFragmentAccess::ReadWrite);
     EntityQuery.AddRequirement<FBulletSimulationFragment>(EMassFragmentAccess::ReadWrite);
 	EntityQuery.AddRequirement<FBulletVisionFragment>(EMassFragmentAccess::ReadWrite);
+	EntityQuery.AddChunkRequirement<FBulletSimTimerChunkFragment>(EMassFragmentAccess::ReadWrite);
     EntityQuery.AddTagRequirement<FBulletHitTag>(EMassFragmentPresence::None);//不具有FBulletHitTag标签的实体才能被BulletHitProcessor处理
 }
 
 void UBulletSimulationProcessor::Execute(FMassEntityManager& EntityManager, FMassExecutionContext& Context)
 {
-    EntityQuery.ForEachEntityChunk(EntityManager, Context,
+    EntityQuery.ForEachEntityChunk( Context,
         [this](FMassExecutionContext& IterContext)
         {
+            //UE_LOG(LogTemp, Log, TEXT("BulletSimulationProcessor Execute"));
             //控制模拟精度
             const float WorldDeltaTime = IterContext.GetDeltaTimeSeconds();
 			const float TargetInterval = 0.032f; // 30Hz的检测频率
@@ -68,13 +72,19 @@ void UBulletSimulationProcessor::Execute(FMassEntityManager& EntityManager, FMas
 
 				// 扫描检测，如果命中，打上Tag并添加HitFragment
                 FHitResult HitResult;
+				FVector TargetLocation;
+                FCollisionQueryParams queryParams;
+
+                queryParams.AddIgnoredActors(Sims[i].ActorToIgnore);
+                queryParams.bReturnPhysicalMaterial = true;
                 if (GetWorld()->SweepSingleByChannel(HitResult, 
                     Start, End,
                     FQuat::Identity, ECC_GameTraceChannel1, 
-                    FCollisionShape::MakeSphere(Sims[i].CollisionRadius)))
+                    FCollisionShape::MakeSphere(Sims[i].CollisionRadius), queryParams)
+                    )
                 {
                     //更新视觉片段的目标位置为命中点
-                    Visions[i].TargetLocation = HitResult.ImpactPoint;
+                    TargetLocation = HitResult.ImpactPoint;
                     //计算从模拟起点到命中的时间
 					float TotalDis = (End - Start).Size();//如果未命中物体理论上移动的距离
 					float MoveDis = (HitResult.ImpactPoint - Start).Size();
@@ -85,14 +95,22 @@ void UBulletSimulationProcessor::Execute(FMassEntityManager& EntityManager, FMas
                     HitFragment.TargetActor = HitResult.GetActor();
                     HitFragment.HitLocation = HitResult.ImpactPoint;
 
+                    //绘制轨迹
+                    //DrawDebugLine(GetWorld(), Start, TargetLocation, FColor::Green, false, 5.0f);
+                    //DrawDebugSphere(GetWorld(), TargetLocation, Sims[i].CollisionRadius, 8, FColor::Red, false, 5.0f);
+
                     //给实体打上Tag并添加HitFragment，交给BulletHitProcessor 处理，注意当前帧不会立马添加FBulletHitTag给相应实体，即后续不会立马执行HitProcessor
                     IterContext.Defer().AddTag<FBulletHitTag>(IterContext.GetEntity(i));
 					IterContext.Defer().PushCommand<FMassCommandAddFragmentInstances>(IterContext.GetEntity(i),HitFragment);
                 }
                 else//如果没有命中
                 {
-					Visions[i].TargetLocation = End;
+                    TargetLocation = End;
+                    //绘制轨迹
+                    //DrawDebugLine(GetWorld(), Start, TargetLocation, FColor::Green, false, 5.0f);
+                    //DrawDebugSphere(GetWorld(), TargetLocation, Sims[i].CollisionRadius, 8, FColor::Green, false, 5.0f);
                 }
+				Visions[i].TargetLocation = TargetLocation;//更新视觉片段的目标位置
             }
         }
     );

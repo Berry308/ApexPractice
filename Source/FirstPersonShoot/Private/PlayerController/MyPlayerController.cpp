@@ -78,7 +78,7 @@ void AMyPlayerController::HandleJump(const FInputActionValue& Value)
 {
 	if(IsValid(playerCharacter))
 	{
-		playerCharacter->Jump(Value);
+		playerCharacter->TiredJump(Value);
 	}
 	else
 	{

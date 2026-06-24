@@ -21,20 +21,17 @@ struct FBulletSimulationFragment : public FMassFragment
     //子弹当前位置
 	FVector CurrentLocation;
     //下坠速度向量
-    UPROPERTY()
 	FVector Gravity;
     //当前速度向量
-	UPROPERTY()
 	FVector Velocity;
     //该子弹的伤害
-    UPROPERTY()
     float Damage;
     //剩余存活时间
-    UPROPERTY()
 	float RemainingLifeTime;
     //碰撞半径
-    UPROPERTY()
-    float CollisionRadius = 5.0f;
+    float CollisionRadius;
+    //使用弱指针，以便当持有武器的角色类被消灭时，避免悬空指针的发生
+    TArray<TWeakObjectPtr<const AActor>> ActorToIgnore;
 };
 
 //SimulationProcessor通过更新该片段，来指定VisionProcessor中子弹插值更新的下一个目标点
@@ -43,7 +40,6 @@ struct FBulletVisionFragment : public FMassFragment
 {
     GENERATED_BODY()
 
-    UPROPERTY()
     FVector TargetLocation;
 
     //float TimeSinceLastSim = 0.0f; // 距离上次模拟逻辑更新经过的时间
@@ -62,13 +58,10 @@ struct FBulletHitFragment : public FMassFragment
     UPROPERTY()
     TWeakObjectPtr<AActor> TargetActor; // 射击命中物
 
-    UPROPERTY()
 	float DamageTimer = 0; // 应用命中时间计时器
 
-    UPROPERTY()
 	float TimeToApplyDamage; // 从命中到应用伤害的延迟时间
 
-    UPROPERTY()
     FVector HitLocation;
 };
 

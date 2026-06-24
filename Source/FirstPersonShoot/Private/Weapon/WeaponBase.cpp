@@ -138,9 +138,20 @@ bool AWeaponBase::ShootValidate()
 	}
 }
 
-void AWeaponBase::PlayWeaponEffect()
+void AWeaponBase::PlayWeaponSound()
 {
-	UE_LOG(LogTemp, Warning, TEXT("PlayWeaponEffect"));
+	//UE_LOG(LogTemp, Warning, TEXT("PlayWeaponSound"));
+
+	if (IsValid(WeaponShootingSound.Get()))
+	{
+		UGameplayStatics::PlaySound2D(GetWorld(), WeaponShootingSound);
+	}
+}
+
+void AWeaponBase::PlayMuzzleFlash()
+{
+	//UE_LOG(LogTemp, Warning, TEXT("PlayMuzzleFlash"));
+
 	if (IsValid(MuzzleFlash.Get()))
 	{
 		UGameplayStatics::SpawnEmitterAttached(MuzzleFlash, WeaponMesh,
@@ -149,11 +160,6 @@ void AWeaponBase::PlayWeaponEffect()
 			EAttachLocation::KeepRelativeOffset, true,
 			EPSCPoolMethod::AutoRelease, true
 		);
-	}
-
-	if (IsValid(WeaponShootingSound.Get()))
-	{
-		UGameplayStatics::PlaySound2D(GetWorld(), WeaponShootingSound);
 	}
 }
 
@@ -332,6 +338,67 @@ float AWeaponBase::CalculateDamage(TObjectPtr<UPhysicalMaterial> PhysicalMateria
 	return finalDamage;
 }
 
+void AWeaponBase::ObjectBulletShoot()
+{
+	//定义弹道模拟将要用到的参数
+	TObjectPtr<APlayerController> PC = Cast<APlayerController>(WeaponOwner->GetController());
+	if (!IsValid(PC.Get())) return;
+
+	FVector CameraLocation;
+	FRotator CameraRotation;
+	PC->GetPlayerViewPoint(CameraLocation, CameraRotation);
+	FVector CameraDirection = CameraRotation.Vector();//需不需要归一化处理？
+
+	FHitResult hitResult;
+	hitResult.Init();
+	float TimeToHit = 0;//子弹从发射到击中的时间
+	TArray<FVector> TrajectoryPoints;
+	TrajectoryPoints.Empty();//先清空弹道轨迹点
+	bool bIsBulletHit = false;
+
+	if (WeaponOwner->bIsAiming)//开镜瞄准
+	{
+		//模拟物理弹道
+		bIsBulletHit = SimulatePhysicsTrajectory(CameraLocation,
+			CameraDirection, BulletInitialSpeed,
+			BulletGravity, BulletMaxLifeTime,
+			BulletRadius, hitResult,
+			TimeToHit, TrajectoryPoints);
+#pragma region TestCode
+		//物理模拟射线检测测试代码
+		//UE_LOG(LogTemp, Warning, TEXT("TimeToHit: %f"), TimeToHit);
+		//UE_LOG(LogTemp, Warning, TEXT("AfterSimulatePhysicsTrajectory:HitActor: %s"),*hitResult.GetActor()->GetName());
+		//TObjectPtr<UPhysicalMaterial> physMaterial = hitResult.PhysMaterial.Get();
+		//if (!physMaterial)
+		//{
+		//	UE_LOG(LogTemp, Error, TEXT("physMaterial is null"));
+		//	return;
+		//}
+		//FString HitComponentName = hitResult.GetComponent() ? hitResult.GetComponent()->GetName() : TEXT("None");
+		//FString PhysMatName = hitResult.PhysMaterial->GetName();//崩溃
+		//FString BoneName = hitResult.BoneName.ToString();
+
+		//UE_LOG(LogTemp, Warning, TEXT("Hit Component: %s,Hit Bone: %s, Physical Material: %s"),
+		//	*HitComponentName, *BoneName, *PhysMatName);
+#pragma endregion
+		//渲染子弹视觉表现，一般来说子弹击中物体的反馈特效由物体来决定，也就是说每个可以被击中的物体都附带有可以供外部调用的特效
+		PlayProjectileLaunch(CameraRotation, TrajectoryPoints, TimeToHit, hitResult, bIsBulletHit);
+	}
+	else//腰射
+	{
+		FVector shootdirection;
+		shootdirection = FMath::VRandCone(CameraDirection, WeaponMaxSpreadAngle);//圆锥体内散布
+		bIsBulletHit = SimulatePhysicsTrajectory(
+			CameraLocation, shootdirection,
+			BulletInitialSpeed, BulletGravity,
+			BulletMaxLifeTime, BulletRadius,
+			hitResult, TimeToHit, TrajectoryPoints
+		);
+		//渲染子弹视觉表现
+		PlayProjectileLaunch(CameraRotation, TrajectoryPoints, TimeToHit, hitResult, bIsBulletHit);
+	}
+}
+
 void AWeaponBase::MassBulletShoot()
 {
 	UWorld* World = GetWorld();
@@ -379,22 +446,18 @@ void AWeaponBase::MassBulletShoot()
 			Sim->Gravity = FVector(0, 0, -980) * BulletGravity;
 			Sim->RemainingLifeTime = BulletMaxLifeTime;
 			Sim->Damage = WeaponDamage;
-		}
-		// 初始化计时器ChunkFragment为模拟步长
-		if (FBulletSimTimerChunkFragment* Timer = EntityManager.GetFragmentDataPtr<FBulletSimTimerChunkFragment>(Entity))
-		{
-			Timer->TimeAccumulator = 0.032f;//30hz模拟
+			Sim->ActorToIgnore = ActorToIgnore;
 		}
 		// 初始化子弹画面表现(设置子弹的初始位置为枪口位置，后续的子弹位置由视觉片段控制)
 		if (FTransformFragment* TF = EntityManager.GetFragmentDataPtr<FTransformFragment>(Entity))
 		{
 			FVector MuzzlePosition = WeaponMesh->GetSocketLocation(FName("Muzzle"));
 			TF->GetMutableTransform().SetLocation(MuzzlePosition);
+			TF->GetMutableTransform().SetScale3D(BulletMeshTransformScale);
 		}
 	}
 
 }
-
 
 //计算伤害，将伤害传递给持有该武器的角色类，让角色类进行伤害的造成.将子弹回收到对象池中。让子弹类来播放特效，让武器类调用击中对象造成伤害的函数
 void AWeaponBase::BulletReachTarget(TObjectPtr<AProjectileBase> Bullet,bool bIsBulletHit,const FHitResult& HitResult, const FVector& BulletShootDirection)
@@ -458,7 +521,7 @@ void AWeaponBase::BulletReachTarget(TObjectPtr<AProjectileBase> Bullet,bool bIsB
 //分为开镜和腰射，射击的起点
 void AWeaponBase::TryShoot()
 {
-	UE_LOG(LogTemp, Display, TEXT("TryShoot"));
+	//UE_LOG(LogTemp, Display, TEXT("TryShoot"));
 	//判断是否满足射击条件（子弹数量、射击频率）
 	if (!ShootValidate())
 	{
@@ -480,7 +543,7 @@ void AWeaponBase::TryShoot()
 	}
 
 	//播放枪械的音效的特效
-	PlayWeaponEffect();
+	PlayWeaponSound();
 
 	//应用后座力改变角色摄像机
 	if (IsValid(WeaponOwner))
@@ -488,66 +551,7 @@ void AWeaponBase::TryShoot()
 		WeaponOwner->PlayerShootingRecoil();
 	}
 
-#pragma region 物理弹道模拟和射线检测，网格体根据物理模拟弹道实现视觉表现的子弹系统的实现思路
-	/*
-//定义弹道模拟将要用到的参数
-TObjectPtr<APlayerController> PC = Cast<APlayerController>(WeaponOwner->GetController());
-if (!IsValid(PC.Get())) return;
-
-FVector CameraLocation;
-FRotator CameraRotation;
-PC->GetPlayerViewPoint(CameraLocation, CameraRotation);
-FVector CameraDirection = CameraRotation.Vector();//需不需要归一化处理？
-
-FHitResult hitResult;
-hitResult.Init();
-float TimeToHit = 0;//子弹从发射到击中的时间
-TArray<FVector> TrajectoryPoints;
-TrajectoryPoints.Empty();//先清空弹道轨迹点
-bool bIsBulletHit = false;
-
-if (WeaponOwner->bIsAiming)//开镜瞄准
-{
-	//模拟物理弹道
-	bIsBulletHit = SimulatePhysicsTrajectory(CameraLocation,
-		CameraDirection,BulletInitialSpeed,
-		BulletGravity,BulletMaxLifeTime,
-		BulletRadius,hitResult,
-		TimeToHit,TrajectoryPoints);
-#pragma region TestCode
-		//物理模拟射线检测测试代码
-		//UE_LOG(LogTemp, Warning, TEXT("TimeToHit: %f"), TimeToHit);
-		//UE_LOG(LogTemp, Warning, TEXT("AfterSimulatePhysicsTrajectory:HitActor: %s"),*hitResult.GetActor()->GetName());
-		//TObjectPtr<UPhysicalMaterial> physMaterial = hitResult.PhysMaterial.Get();
-		//if (!physMaterial)
-		//{
-		//	UE_LOG(LogTemp, Error, TEXT("physMaterial is null"));
-		//	return;
-		//}
-		//FString HitComponentName = hitResult.GetComponent() ? hitResult.GetComponent()->GetName() : TEXT("None");
-		//FString PhysMatName = hitResult.PhysMaterial->GetName();//崩溃
-		//FString BoneName = hitResult.BoneName.ToString();
-
-		//UE_LOG(LogTemp, Warning, TEXT("Hit Component: %s,Hit Bone: %s, Physical Material: %s"),
-		//	*HitComponentName, *BoneName, *PhysMatName);
-#pragma endregion
-		//渲染子弹视觉表现，一般来说子弹击中物体的反馈特效由物体来决定，也就是说每个可以被击中的物体都附带有可以供外部调用的特效
-		PlayProjectileLaunch(CameraRotation, TrajectoryPoints, TimeToHit, hitResult, bIsBulletHit);
-	}
-	else//腰射
-	{
-		FVector shootdirection;
-		shootdirection = FMath::VRandCone(CameraDirection, WeaponMaxSpreadAngle);//圆锥体内散布
-		bIsBulletHit = SimulatePhysicsTrajectory(
-			CameraLocation, shootdirection,
-			BulletInitialSpeed, BulletGravity,
-			BulletMaxLifeTime, BulletRadius,
-			hitResult, TimeToHit, TrajectoryPoints
-		);
-		//渲染子弹视觉表现
-		PlayProjectileLaunch(CameraRotation, TrajectoryPoints, TimeToHit, hitResult, bIsBulletHit);
-	}*/
-#pragma endregion
+	//ObjectBulletShoot();
 
 	MassBulletShoot();
 }

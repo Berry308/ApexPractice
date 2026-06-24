@@ -38,7 +38,7 @@ public:
 	void StopRun(const FInputActionValue& Value);
 	void MoveForward(const FInputActionValue& Value);
 	void MoveRight(const FInputActionValue& Value);
-	void Jump(const FInputActionValue& Value);
+	void TiredJump(const FInputActionValue& Value);
 	//Player Action
 	void ToggleCameraView();
 	void Fire();

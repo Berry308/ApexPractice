@@ -12,18 +12,19 @@ UBulletVisionProcessor::UBulletVisionProcessor()
 	ProcessingPhase = EMassProcessingPhase::DuringPhysics;
 	ExecutionOrder.ExecuteAfter.Add(UBulletSimulationProcessor::StaticClass()->GetFName());
 	//ProcessingInterval = 0.016f; // 每帧更新（假设60 FPS）
-    
+    RegisterQuery(EntityQuery);
 }
 
 void UBulletVisionProcessor::ConfigureQueries(const TSharedRef<FMassEntityManager>& EntityManager)
 {
+    EntityQuery.RegisterWithProcessor(*this);
 	EntityQuery.AddRequirement<FTransformFragment>(EMassFragmentAccess::ReadWrite);
 	EntityQuery.AddRequirement<FBulletVisionFragment>(EMassFragmentAccess::ReadWrite);
 }
 
 void UBulletVisionProcessor::Execute(FMassEntityManager& EntityManager, FMassExecutionContext& Context)
 {
-    EntityQuery.ForEachEntityChunk(EntityManager, Context, 
+    EntityQuery.ForEachEntityChunk( Context, 
         [this](FMassExecutionContext& IterContext)
         {
             auto Transforms = IterContext.GetMutableFragmentView<FTransformFragment>();

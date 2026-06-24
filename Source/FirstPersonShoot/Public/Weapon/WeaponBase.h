@@ -66,6 +66,9 @@ public:
 	float BulletRadius;//子弹的半径大小
 
 	UPROPERTY(EditAnywhere, Category = "WeaponProperty")
+	FVector BulletMeshTransformScale = FVector(1.0f,1.0f,1.0f);
+
+	UPROPERTY(EditAnywhere, Category = "WeaponProperty")
 	float BulletInitialSpeed;//子弹初速度
 
 	UPROPERTY(EditAnywhere, Category = "WeaponProperty")
@@ -141,7 +144,10 @@ public:
 	void PlayShootAnimation();
 	
 	UFUNCTION()
-	void PlayWeaponEffect();
+	void PlayWeaponSound();
+
+	UFUNCTION()
+	void PlayMuzzleFlash();
 
 	UFUNCTION()
 	void OnWeaponBeEquipedBy(AActor* NewOwner);
@@ -169,6 +175,8 @@ protected:
 		const FHitResult& HitResult, bool bIsHit);
 
 	float CalculateDamage(TObjectPtr<UPhysicalMaterial> PhysicalMaterial);
+
+	void ObjectBulletShoot();
 
 	void MassBulletShoot();
 };

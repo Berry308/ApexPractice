@@ -10,20 +10,22 @@
 UBulletHitProcessor::UBulletHitProcessor()
 {
 	bRequiresGameThreadExecution = true;
-	ProcessingPhase = EMassProcessingPhase::DuringPhysics;
-	ExecutionOrder.ExecuteAfter.Add(UBulletSimulationProcessor::StaticClass()->GetFName());
+	ProcessingPhase = EMassProcessingPhase::FrameEnd;
+	//ExecutionOrder.ExecuteAfter.Add(UBulletSimulationProcessor::StaticClass()->GetFName());
+    RegisterQuery(EntityQuery);
 }
 
 void UBulletHitProcessor::ConfigureQueries(const TSharedRef<FMassEntityManager>& EntityManager)
 {
-	EntityQuery.AddRequirement<FBulletHitFragment>(EMassFragmentAccess::ReadOnly);
+    EntityQuery.RegisterWithProcessor(*this);
+	EntityQuery.AddRequirement<FBulletHitFragment>(EMassFragmentAccess::ReadWrite);
 	// 核心优化：只查询带 HitTag 的实体
 	EntityQuery.AddTagRequirement<FBulletHitTag>(EMassFragmentPresence::All);
 }
 
 void UBulletHitProcessor::Execute(FMassEntityManager& EntityManager, FMassExecutionContext& Context)
 {
-    EntityQuery.ForEachEntityChunk(EntityManager, Context, 
+    EntityQuery.ForEachEntityChunk( Context, 
         [this](FMassExecutionContext& IterContext){
             auto Hits = IterContext.GetMutableFragmentView<FBulletHitFragment>();
 
@@ -39,10 +41,12 @@ void UBulletHitProcessor::Execute(FMassEntityManager& EntityManager, FMassExecut
                 {
 					//造成伤害，question：如何在造成伤害的同时传递伤害来源和伤害类型等信息？
                     //Target->TakeDamage(Hits[i].Damage, FDamageEvent(), nullptr, nullptr);
+					UE_LOG(LogTemp, Warning, TEXT("BulletHitProcessor: Bullet hit target %s and applied damage."), *Target->GetName());
                 }
 
                 // 处理完后销毁子弹实体
                 IterContext.Defer().DestroyEntity(IterContext.GetEntity(i));
+				UE_LOG(LogTemp, Warning, TEXT("BulletHitProcessor: Destroyed bullet entity after hitting target."));
             }
         }
     );

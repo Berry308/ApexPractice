@@ -200,7 +200,7 @@ void AThirdPersonCharacter::MoveRight(const FInputActionValue& Value)
 	}
 }
 
-void AThirdPersonCharacter::Jump(const FInputActionValue& Value)
+void AThirdPersonCharacter::TiredJump(const FInputActionValue& Value)
 {
 	//跳跃会疲劳，跳跃高度会随着距离上一次跳跃发生的时间而恢复，恢复时间为2秒
 
