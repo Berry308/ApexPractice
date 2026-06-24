@@ -74,7 +74,6 @@ void AWeaponBase::BeginPlay()
 
 	//初始化碰撞列表,忽略武器自身
 	ActorToIgnore.Add(this);
-
 	//武器腰射散布调整
 	WeaponMaxSpreadAngle /= 100;
 }
@@ -451,9 +450,13 @@ void AWeaponBase::MassBulletShoot()
 		// 初始化子弹画面表现(设置子弹的初始位置为枪口位置，后续的子弹位置由视觉片段控制)
 		if (FTransformFragment* TF = EntityManager.GetFragmentDataPtr<FTransformFragment>(Entity))
 		{
-			FVector MuzzlePosition = WeaponMesh->GetSocketLocation(FName("Muzzle"));
-			TF->GetMutableTransform().SetLocation(MuzzlePosition);
+			TF->GetMutableTransform().SetLocation(WeaponMesh->GetSocketLocation(TEXT("Muzzle")));
 			TF->GetMutableTransform().SetScale3D(BulletMeshTransformScale);
+		}
+		// 初始化视觉片段的目标位置为枪口位置，避免第一帧插值到零向量
+		if (FBulletVisionFragment* Vision = EntityManager.GetFragmentDataPtr<FBulletVisionFragment>(Entity))
+		{
+			Vision->TargetLocation = WeaponMesh->GetSocketLocation(TEXT("Muzzle"));
 		}
 	}
 

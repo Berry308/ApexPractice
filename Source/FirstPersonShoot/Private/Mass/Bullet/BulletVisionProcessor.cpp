@@ -28,7 +28,7 @@ void UBulletVisionProcessor::Execute(FMassEntityManager& EntityManager, FMassExe
         [this](FMassExecutionContext& IterContext)
         {
             auto Transforms = IterContext.GetMutableFragmentView<FTransformFragment>();
-            auto Interps = IterContext.GetMutableFragmentView<FBulletVisionFragment>();
+            auto Interps = IterContext.GetFragmentView<FBulletVisionFragment>();
             const float DeltaTime = IterContext.GetDeltaTimeSeconds();
 
             for (int32 i = 0; i < IterContext.GetNumEntities(); ++i)

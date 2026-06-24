@@ -74,7 +74,7 @@ public:
 	UPROPERTY(EditAnywhere, Category = "WeaponProperty")
 	float BulletGravity;//子弹的下坠
 
-	/** 武器腰射散布的最大角度的cos值*/
+	/** 武器腰射散布的最大角度*/
 	UPROPERTY(EditAnywhere, Category = "WeaponProperty")
 	float WeaponMaxSpreadAngle;
 
