@@ -453,11 +453,7 @@ void AWeaponBase::MassBulletShoot()
 			TF->GetMutableTransform().SetLocation(WeaponMesh->GetSocketLocation(TEXT("Muzzle")));
 			TF->GetMutableTransform().SetScale3D(BulletMeshTransformScale);
 		}
-		// 初始化视觉片段的目标位置为枪口位置，避免第一帧插值到零向量
-		if (FBulletVisionFragment* Vision = EntityManager.GetFragmentDataPtr<FBulletVisionFragment>(Entity))
-		{
-			Vision->TargetLocation = WeaponMesh->GetSocketLocation(TEXT("Muzzle"));
-		}
+		//刷新Chunk计时器，以便第一帧就进行子弹模拟
 	}
 
 }
