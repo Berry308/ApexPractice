@@ -34,27 +34,30 @@ void UBulletSimulationProcessor::Execute(FMassEntityManager& EntityManager, FMas
         {
             //UE_LOG(LogTemp, Log, TEXT("BulletSimulationProcessor Execute"));
             //控制模拟精度
+            bool bChunkNeedUpdate = false;
             const float WorldDeltaTime = IterContext.GetDeltaTimeSeconds();
 			const float TargetInterval = 0.032f; // 30Hz的检测频率
-            // 获取该块的计时器
             FBulletSimTimerChunkFragment& Timer = IterContext.GetMutableChunkFragment<FBulletSimTimerChunkFragment>();
             Timer.TimeAccumulator += WorldDeltaTime;
-            //如果累积的时间还没有达到目标间隔，跳过模拟逻辑更新
-            if (Timer.TimeAccumulator < TargetInterval)
+            if (Timer.TimeAccumulator >= TargetInterval) //如果累积的时间达到目标间隔
             {
-                return;
+                bChunkNeedUpdate = true;
+                Timer.TimeAccumulator = 0.0f;//重置该块的模拟计时器
             }
+
+            //如果块不包含脏标记且bChunkNeedUpdate为false，跳过该块的模拟
+            if (!Timer.bIsChunkDirty && !bChunkNeedUpdate) return;
 
             auto Sims = IterContext.GetMutableFragmentView<FBulletSimulationFragment>();
             auto Visions = IterContext.GetMutableFragmentView<FBulletVisionFragment>();
             //auto Hits = IterContext.GetMutableFragmentView<FBulletHitFragment>();
 
-            //重置该块的模拟计时器
-			Timer.TimeAccumulator = 0.0f;
-
-			//*遍历块内实体，更新每个子弹的模拟逻辑
+			//遍历块内实体，更新每个子弹的模拟逻辑
             for (int32 i = 0; i < IterContext.GetNumEntities(); ++i)
             {
+                //判断子弹是否需要模拟
+                if (!bChunkNeedUpdate && !Sims[i].bNeedFirstSim) continue;
+                Sims[i].bNeedFirstSim = false;
                 //判断子弹剩余存活时间
                 if (Sims[i].RemainingLifeTime <= 0.0f)
                 {
@@ -94,14 +97,14 @@ void UBulletSimulationProcessor::Execute(FMassEntityManager& EntityManager, FMas
                     HitFragment.TimeToApplyDamage = TimeToHit;
                     HitFragment.TargetActor = HitResult.GetActor();
                     HitFragment.HitLocation = HitResult.ImpactPoint;
+                    //给实体打上Tag并添加HitFragment，交给BulletHitProcessor 处理，注意当前帧不会立马添加FBulletHitTag给相应实体，即后续不会立马执行HitProcessor
+                    IterContext.Defer().AddTag<FBulletHitTag>(IterContext.GetEntity(i));
+                    IterContext.Defer().PushCommand<FMassCommandAddFragmentInstances>(IterContext.GetEntity(i), HitFragment);
 
                     //绘制轨迹
                     //DrawDebugLine(GetWorld(), Start, TargetLocation, FColor::Green, false, 5.0f);
                     //DrawDebugSphere(GetWorld(), TargetLocation, Sims[i].CollisionRadius, 8, FColor::Red, false, 5.0f);
 
-                    //给实体打上Tag并添加HitFragment，交给BulletHitProcessor 处理，注意当前帧不会立马添加FBulletHitTag给相应实体，即后续不会立马执行HitProcessor
-                    IterContext.Defer().AddTag<FBulletHitTag>(IterContext.GetEntity(i));
-					IterContext.Defer().PushCommand<FMassCommandAddFragmentInstances>(IterContext.GetEntity(i),HitFragment);
                 }
                 else//如果没有命中
                 {
@@ -112,6 +115,9 @@ void UBulletSimulationProcessor::Execute(FMassEntityManager& EntityManager, FMas
                 }
 				Visions[i].TargetLocation = TargetLocation;//更新视觉片段的目标位置
             }
+
+            //遍历完所有的块内实体后，去除该块的脏标记
+            Timer.bIsChunkDirty = false;
         }
     );
 }

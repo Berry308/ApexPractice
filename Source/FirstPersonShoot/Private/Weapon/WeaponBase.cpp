@@ -15,6 +15,7 @@
 #include "MassEntityManager.h"
 #include "MassEntityTypes.h"
 #include "MassCommonFragments.h"
+#include "MassEntityBuilder.h"
 #include "Mass/Bullet/BulletFragments.h"
 
 
@@ -402,8 +403,17 @@ void AWeaponBase::MassBulletShoot()
 {
 	UWorld* World = GetWorld();
 	UMassSpawnerSubsystem* SpawnerSubsystem = UWorld::GetSubsystem<UMassSpawnerSubsystem>(World);
-	if (!SpawnerSubsystem || !BulletMassConfig) return;
+	check(SpawnerSubsystem);
+	UMassEntitySubsystem* MassSubsystem = UWorld::GetSubsystem<UMassEntitySubsystem>(World);
+	check(MassSubsystem);
+	FMassEntityManager& EntityManager = MassSubsystem->GetMutableEntityManager();
+	if (!BulletMassConfig)
+	{
+		UE_LOG(LogTemp, Error, TEXT("AWeaponBase::MassBulletShoot : Do not has a BulletMassConfig"));
+		return;
+	}
 
+	// 方法一：通过UMassSpawnerSubsystem创建实体
 	// 1. 获取该配置对应的模板
 	FMassEntityTemplate Template = BulletMassConfig->GetConfig().GetOrCreateEntityTemplate(*World);
 
@@ -412,10 +422,6 @@ void AWeaponBase::MassBulletShoot()
 	SpawnerSubsystem->SpawnEntities(Template, 1, OutEntities);
 
 	// 3. 初始化数据
-	UMassEntitySubsystem* MassSubsystem = UWorld::GetSubsystem<UMassEntitySubsystem>(World);
-	check(MassSubsystem);
-	FMassEntityManager& EntityManager = MassSubsystem->GetMutableEntityManager();
-
 	for (FMassEntityHandle Entity : OutEntities)
 	{
 		TObjectPtr<APlayerController> PC = Cast<APlayerController>(WeaponOwner->GetController());
@@ -437,6 +443,7 @@ void AWeaponBase::MassBulletShoot()
 		//初始化BulletSimulationFragment：Gravity、Velocity、子弹半径、子弹伤害、子弹最大生存时间
 		if (FBulletSimulationFragment* Sim = EntityManager.GetFragmentDataPtr<FBulletSimulationFragment>(Entity))
 		{
+			Sim->bNeedFirstSim = true;
 			Sim->InstigatorActor = WeaponOwner;
 			Sim->RemainingLifeTime = BulletMaxLifeTime;
 			Sim->CurrentLocation = CameraLocation;
@@ -453,9 +460,30 @@ void AWeaponBase::MassBulletShoot()
 			TF->GetMutableTransform().SetLocation(WeaponMesh->GetSocketLocation(TEXT("Muzzle")));
 			TF->GetMutableTransform().SetScale3D(BulletMeshTransformScale);
 		}
-		//刷新Chunk计时器，以便第一帧就进行子弹模拟
 	}
 
+	/*
+	// 方法二：使用 Builder 创建实体
+	FTransformFragment Tran;
+	Tran.GetMutableTransform().SetLocation(WeaponMesh->GetSocketLocation(TEXT("Muzzle")));
+	Tran.GetMutableTransform().SetScale3D(BulletMeshTransformScale);
+	FBulletSimulationFragment Sim;
+	Sim.bNeedFirstSim = true;
+	Sim.InstigatorActor = WeaponOwner;
+	Sim.RemainingLifeTime = BulletMaxLifeTime;
+	Sim.CurrentLocation = CameraLocation;
+	Sim.Velocity = ShootDirection * BulletInitialSpeed;
+	Sim.CollisionRadius = BulletRadius;
+	Sim.Gravity = FVector(0, 0, -980) * BulletGravity;
+	Sim.RemainingLifeTime = BulletMaxLifeTime;
+	Sim.Damage = WeaponDamage;
+	Sim.ActorToIgnore = ActorToIgnore;
+
+	FMassEntityHandle NewEntity = EntityManager.MakeEntityBuilder()
+		.Add<FTransformFragment>(Tran)
+		.Add<FBulletSimulationFragment>(Sim)
+		.Commit();
+	*/
 }
 
 //计算伤害，将伤害传递给持有该武器的角色类，让角色类进行伤害的造成.将子弹回收到对象池中。让子弹类来播放特效，让武器类调用击中对象造成伤害的函数

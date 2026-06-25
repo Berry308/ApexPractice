@@ -30,6 +30,8 @@ struct FBulletSimulationFragment : public FMassFragment
 	float RemainingLifeTime;
     //碰撞半径
     float CollisionRadius;
+    //该子弹是否已经进行了第一次模拟
+	uint8 bNeedFirstSim : 1; 
     //使用弱指针，以便当持有武器的角色类被消灭时，避免悬空指针的发生
     TArray<TWeakObjectPtr<const AActor>> ActorToIgnore;
 };
@@ -72,6 +74,7 @@ struct FBulletSimTimerChunkFragment : public FMassChunkFragment
 	//注：第一次执行时需要初始化该值为设定的模拟步长，以确保第一帧就能执行模拟逻辑更新
     GENERATED_BODY()
     float TimeAccumulator = 0.032f;
+	uint8 bIsChunkDirty : 1; // 标记该块是否存在变动
 };
 
 // 子弹标识标签（无数据，仅用于过滤命中的子弹实体）
