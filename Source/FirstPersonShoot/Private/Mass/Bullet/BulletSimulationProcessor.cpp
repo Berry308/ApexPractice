@@ -3,9 +3,9 @@
 
 #include "Mass/Bullet/BulletSimulationProcessor.h"
 #include "Mass/Bullet/BulletFragments.h"
+#include "Mass/Bullet/BulletGeneratedObserverProcessor.h"
 #include "MassCommonFragments.h"
 #include "MassExecutionContext.h"
-
 
 UBulletSimulationProcessor::UBulletSimulationProcessor()
 {
@@ -32,7 +32,7 @@ void UBulletSimulationProcessor::Execute(FMassEntityManager& EntityManager, FMas
     EntityQuery.ForEachEntityChunk( Context,
         [this](FMassExecutionContext& IterContext)
         {
-            //UE_LOG(LogTemp, Log, TEXT("BulletSimulationProcessor Execute"));
+            UE_LOG(LogTemp, Log, TEXT("BulletSimulationProcessor Execute"));
             //控制模拟精度
             bool bChunkNeedUpdate = false;
             const float WorldDeltaTime = IterContext.GetDeltaTimeSeconds();
@@ -45,8 +45,12 @@ void UBulletSimulationProcessor::Execute(FMassEntityManager& EntityManager, FMas
                 Timer.TimeAccumulator = 0.0f;//重置该块的模拟计时器
             }
 
+            UE_LOG(LogTemp, Log, TEXT("UBulletSimulationProcessor query chunk,dirty status: %d"), Timer.bIsChunkDirty);
             //如果块不包含脏标记且bChunkNeedUpdate为false，跳过该块的模拟
-            if (!Timer.bIsChunkDirty && !bChunkNeedUpdate) return;
+            if (!Timer.bIsChunkDirty && !bChunkNeedUpdate)
+            {
+                return;
+            }
 
             auto Sims = IterContext.GetMutableFragmentView<FBulletSimulationFragment>();
             auto Visions = IterContext.GetMutableFragmentView<FBulletVisionFragment>();
@@ -55,8 +59,8 @@ void UBulletSimulationProcessor::Execute(FMassEntityManager& EntityManager, FMas
 			//遍历块内实体，更新每个子弹的模拟逻辑
             for (int32 i = 0; i < IterContext.GetNumEntities(); ++i)
             {
-                //判断子弹是否需要模拟
-                if (!bChunkNeedUpdate && !Sims[i].bNeedFirstSim) continue;
+                //如果当前实体不需要第一次模拟 并且 当前块不需要更新
+                if (!Sims[i].bNeedFirstSim && !bChunkNeedUpdate) continue;
                 Sims[i].bNeedFirstSim = false;
                 //判断子弹剩余存活时间
                 if (Sims[i].RemainingLifeTime <= 0.0f)
@@ -64,6 +68,7 @@ void UBulletSimulationProcessor::Execute(FMassEntityManager& EntityManager, FMas
 					IterContext.Defer().DestroyEntity(IterContext.GetEntity(i));//如果子弹存活时间耗尽，销毁实体
                     continue;
                 }
+                UE_LOG(LogTemp, Log, TEXT("UBulletSimulationProcessor::Execute single entity"));
 				//根据当前速度、方向和重力计算子弹的下一个位置
 				FVector Start = Sims[i].CurrentLocation;
 				FVector Velocity = Sims[i].Velocity + Sims[i].Gravity * IterContext.GetDeltaTimeSeconds();//在当前速度基础上叠加重力影响
@@ -115,7 +120,6 @@ void UBulletSimulationProcessor::Execute(FMassEntityManager& EntityManager, FMas
                 }
 				Visions[i].TargetLocation = TargetLocation;//更新视觉片段的目标位置
             }
-
             //遍历完所有的块内实体后，去除该块的脏标记
             Timer.bIsChunkDirty = false;
         }

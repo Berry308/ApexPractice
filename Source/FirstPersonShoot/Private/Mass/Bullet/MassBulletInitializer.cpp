@@ -22,6 +22,7 @@ void UMassBulletInitializer::ConfigureQueries(const TSharedRef<FMassEntityManage
 
 void UMassBulletInitializer::Execute(FMassEntityManager& EntityManager, FMassExecutionContext& Context)
 {
+    UE_LOG(LogTemp, Log, TEXT("UMassBulletInitializer::Execute"));
     // 从 Context 中获取传入的 SpawnData
     const FBulletSpawnData* SpawnData = Context.GetAuxData().GetPtr<FBulletSpawnData>();
     if (!SpawnData) return;

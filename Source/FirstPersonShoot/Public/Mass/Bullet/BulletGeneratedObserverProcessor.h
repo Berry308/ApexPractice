@@ -17,7 +17,6 @@ public:
 	UBulletGeneratedObserverProcessor();
 
 protected:
-    // 必须重写 ConfigureQueries 和 Execute
     virtual void ConfigureQueries(const TSharedRef<FMassEntityManager>& EntityManager) override;
     virtual void Execute(FMassEntityManager& EntityManager, FMassExecutionContext& Context) override;
 

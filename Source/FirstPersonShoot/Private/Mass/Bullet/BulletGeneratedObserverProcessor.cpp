@@ -22,12 +22,13 @@ void UBulletGeneratedObserverProcessor::ConfigureQueries(const TSharedRef<FMassE
 
 void UBulletGeneratedObserverProcessor::Execute(FMassEntityManager& EntityManager, FMassExecutionContext& Context)
 {
+    UE_LOG(LogTemp, Log, TEXT("UBulletGeneratedObserverProcessor::Execute"));
     EntityQuery.ForEachEntityChunk(Context, [this](FMassExecutionContext& IterContext)
         {
             FBulletSimTimerChunkFragment& Timer = IterContext.GetMutableChunkFragment<FBulletSimTimerChunkFragment>();
-			Timer.bIsChunkDirty = 1; // 标记该块为脏块，表示需要立即进行模拟更新
+			Timer.bIsChunkDirty = true; // 标记该块为脏块，表示需要立即进行模拟更新
 
-            UE_LOG(LogTemp, Log, TEXT("Observer: A new BulletEntity has added to a chunk."));
+            UE_LOG(LogTemp, Warning, TEXT("Observer: A new BulletEntity has added to a chunk.Mark the chunk as Dirty %d"), Timer.bIsChunkDirty);
         }
     );
 }
