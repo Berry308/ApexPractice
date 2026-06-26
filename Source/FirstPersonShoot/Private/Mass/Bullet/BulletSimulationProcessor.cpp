@@ -3,7 +3,6 @@
 
 #include "Mass/Bullet/BulletSimulationProcessor.h"
 #include "Mass/Bullet/BulletFragments.h"
-#include "Mass/Bullet/BulletGeneratedObserverProcessor.h"
 #include "MassCommonFragments.h"
 #include "MassExecutionContext.h"
 
@@ -32,7 +31,7 @@ void UBulletSimulationProcessor::Execute(FMassEntityManager& EntityManager, FMas
     EntityQuery.ForEachEntityChunk( Context,
         [this](FMassExecutionContext& IterContext)
         {
-            UE_LOG(LogTemp, Log, TEXT("BulletSimulationProcessor Execute"));
+            //UE_LOG(LogTemp, Log, TEXT("BulletSimulationProcessor Execute"));
             //控制模拟精度
             bool bChunkNeedUpdate = false;
             const float WorldDeltaTime = IterContext.GetDeltaTimeSeconds();
@@ -45,12 +44,12 @@ void UBulletSimulationProcessor::Execute(FMassEntityManager& EntityManager, FMas
                 Timer.TimeAccumulator = 0.0f;//重置该块的模拟计时器
             }
 
-            UE_LOG(LogTemp, Log, TEXT("UBulletSimulationProcessor query chunk,dirty status: %d"), Timer.bIsChunkDirty);
+            //UE_LOG(LogTemp, Log, TEXT("UBulletSimulationProcessor query chunk,dirty status: %d"), Timer.bIsChunkDirty);
             //如果块不包含脏标记且bChunkNeedUpdate为false，跳过该块的模拟
-            if (!Timer.bIsChunkDirty && !bChunkNeedUpdate)
-            {
-                return;
-            }
+            //if (!Timer.bIsChunkDirty && !bChunkNeedUpdate)
+            //{
+            //    return;
+            //}
 
             auto Sims = IterContext.GetMutableFragmentView<FBulletSimulationFragment>();
             auto Visions = IterContext.GetMutableFragmentView<FBulletVisionFragment>();
@@ -121,7 +120,7 @@ void UBulletSimulationProcessor::Execute(FMassEntityManager& EntityManager, FMas
 				Visions[i].TargetLocation = TargetLocation;//更新视觉片段的目标位置
             }
             //遍历完所有的块内实体后，去除该块的脏标记
-            Timer.bIsChunkDirty = false;
+            //Timer.bIsChunkDirty = false;
         }
     );
 }

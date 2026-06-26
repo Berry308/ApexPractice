@@ -74,7 +74,7 @@ struct FBulletSimTimerChunkFragment : public FMassChunkFragment
 	//注：第一次执行时需要初始化该值为设定的模拟步长，以确保第一帧就能执行模拟逻辑更新
     GENERATED_BODY()
     float TimeAccumulator = 0.032f;
-	uint8 bIsChunkDirty : 1; // 标记该块是否存在变动
+	//uint8 bIsChunkDirty : 1; // 标记该块是否存在变动
 };
 
 // 子弹标识标签（无数据，仅用于过滤命中的子弹实体）
