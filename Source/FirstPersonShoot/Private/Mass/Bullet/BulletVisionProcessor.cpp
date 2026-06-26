@@ -38,7 +38,7 @@ void UBulletVisionProcessor::Execute(FMassEntityManager& EntityManager, FMassExe
                 {
                     UE_LOG(LogTemp, Warning, TEXT("Bullet's TargetLocation do not initialized"));
                 }
-                UE_LOG(LogTemp, Log, TEXT("UBulletVisionProcessor::Execute single entity"));
+                //UE_LOG(LogTemp, Log, TEXT("UBulletVisionProcessor::Execute single entity"));
                 // 计算 Alpha (0.0 到 1.0)，子弹飞行计算以30hz进行
                 float Alpha = FMath::Clamp(DeltaTime / 0.032, 0.0f, 1.0f);
 

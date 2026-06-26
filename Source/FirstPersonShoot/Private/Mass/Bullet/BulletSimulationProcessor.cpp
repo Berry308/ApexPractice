@@ -67,7 +67,7 @@ void UBulletSimulationProcessor::Execute(FMassEntityManager& EntityManager, FMas
 					IterContext.Defer().DestroyEntity(IterContext.GetEntity(i));//如果子弹存活时间耗尽，销毁实体
                     continue;
                 }
-                UE_LOG(LogTemp, Log, TEXT("UBulletSimulationProcessor::Execute single entity"));
+                //UE_LOG(LogTemp, Log, TEXT("UBulletSimulationProcessor::Execute single entity"));
 				//根据当前速度、方向和重力计算子弹的下一个位置
 				FVector Start = Sims[i].CurrentLocation;
 				FVector Velocity = Sims[i].Velocity + Sims[i].Gravity * IterContext.GetDeltaTimeSeconds();//在当前速度基础上叠加重力影响

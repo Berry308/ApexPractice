@@ -22,10 +22,14 @@ void UMassBulletInitializer::ConfigureQueries(const TSharedRef<FMassEntityManage
 
 void UMassBulletInitializer::Execute(FMassEntityManager& EntityManager, FMassExecutionContext& Context)
 {
-    UE_LOG(LogTemp, Log, TEXT("UMassBulletInitializer::Execute"));
+    //UE_LOG(LogTemp, Log, TEXT("UMassBulletInitializer::Execute"));
     // 从 Context 中获取传入的 SpawnData
     const FBulletSpawnData* SpawnData = Context.GetAuxData().GetPtr<FBulletSpawnData>();
-    if (!SpawnData) return;
+    if (!SpawnData)
+    {
+        UE_LOG(LogTemp, Warning, TEXT("UMassBulletInitializer::Execute do not have a SpawnData"));
+        return;
+    }
 
     EntityQuery.ForEachEntityChunk(EntityManager, Context, [SpawnData](FMassExecutionContext& IterContext)
         {

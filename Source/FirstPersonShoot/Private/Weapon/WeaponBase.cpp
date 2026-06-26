@@ -47,19 +47,6 @@ void AWeaponBase::BeginPlay()
 {
 	Super::BeginPlay();
 	//初始化对象池
-	/*此为旧的继承自AActor的对象池初始化操作
-	FActorSpawnParameters SpawnParams;
-	SpawnParams.Owner = this; // 设置武器为所有者
-	SpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
-
-	ProjectileObjectPool = GetWorld()->SpawnActor<AMyObjectPool>(
-		UMyObjectPool::StaticClass(),
-		FVector::ZeroVector,
-		FRotator::ZeroRotator,
-		SpawnParams
-	);
-	*/
-	//继承自UObject的新对象池的初始化
 	ProjectileObjectPool = NewObject<UMyObjectPool>(this);
 
 	//根据射击频率和子弹的存活时间计算出对象池的大小
@@ -96,22 +83,43 @@ void AWeaponBase::ResetWeaponProperty()
 //射击合法性检验
 bool AWeaponBase::ShootValidate()
 {
-	//子弹数量是否足够
-	if (WeaponOwner->bIsEndlessAmmo == false)
+	return /*AmmoCheck() &&*/ ShootFrequencyValidate();
+}
+bool AWeaponBase::AmmoCheck()
+{
+	if (CurrentClipAmmo == 0)
 	{
-		if (CurrentClipAmmo == 0)//当前弹夹子弹数为0
+		if (IsValid(WeaponOwner))
 		{
-			if (WeaponOwner->bAutoReload)//是否在弹夹子弹数为零时自动换弹
+			if (!WeaponOwner->bIsEndlessAmmo)
 			{
-				//执行换弹操作(换弹动作是否可以打断)
-
+				if (WeaponOwner->bAutoReload)
+				{
+					//执行换弹操作(换弹动作是否可以打断)
+				}
+				else
+				{
+					//提示当前子弹数量为零
+				}
+				return false;
 			}
-			//提示当前子弹数量为零
-
+			else
+			{
+				return true;
+			}
+		}
+		else
+		{
 			return false;
 		}
 	}
-	
+	else
+	{
+		return true;
+	}
+}
+bool AWeaponBase::ShootFrequencyValidate()
+{
 	//是否符合武器的射击频率
 	if (_lastShootTilNow >= ShootFrequency)
 	{
@@ -135,6 +143,63 @@ bool AWeaponBase::ShootValidate()
 	else
 	{
 		return false;
+	}
+}
+
+float AWeaponBase::CalculateDamage(TObjectPtr<UPhysicalMaterial> PhysicalMaterial)
+{
+	UE_LOG(LogTemp, Warning, TEXT("WeaponBase:CalculateDamage"));
+	//根据命中部位的不同，计算方式也有所不同
+	if (!IsValid(PhysicalMaterial.Get()))
+	{
+		UE_LOG(LogTemp, Warning, TEXT("WeaponBase:CalculateDamage: PhysicalMaterial get failed"));
+		return WeaponDamage;
+	}
+
+	float finalDamage = 0;
+
+
+	UE_LOG(LogTemp, Warning, TEXT("HitedPhysicalMaterial: %s"), *PhysicalMaterial->GetName());
+	switch (PhysicalMaterial->SurfaceType)
+	{
+	case EPhysicalSurface::SurfaceType1:
+	{
+		//头部
+		finalDamage = WeaponDamage * 1.2;
+	}
+	break;
+	case EPhysicalSurface::SurfaceType2:
+	{
+		//身体
+		finalDamage = WeaponDamage * 1.0;
+	}
+	break;
+	}
+	return finalDamage;
+}
+
+FVector AWeaponBase::CalculateShootDirection()
+{
+	if (IsValid(WeaponOwner))
+	{
+		TObjectPtr<APlayerController> PC = Cast<APlayerController>(WeaponOwner->GetController());
+		check(PC);
+		FVector CameraLocation;
+		FRotator CameraRotation;
+		PC->GetPlayerViewPoint(CameraLocation, CameraRotation);
+
+		if (WeaponOwner->bIsAiming == false)
+		{
+			return FMath::VRandCone(CameraRotation.Vector(), WeaponMaxSpreadAngle);
+		}
+		else
+		{
+			return CameraRotation.Vector();
+		}
+	}
+	else
+	{
+		return GetActorRotation().Vector();
 	}
 }
 
@@ -306,48 +371,28 @@ void AWeaponBase::PlayProjectileLaunch(const FRotator& SpawnDirection,
 	}
 }
 
-float AWeaponBase::CalculateDamage(TObjectPtr<UPhysicalMaterial> PhysicalMaterial)
-{
-	UE_LOG(LogTemp, Warning, TEXT("WeaponBase:CalculateDamage"));
-	//根据命中部位的不同，计算方式也有所不同
-	if (!IsValid(PhysicalMaterial.Get()))
-	{
-		UE_LOG(LogTemp, Warning, TEXT("WeaponBase:CalculateDamage: PhysicalMaterial get failed"));
-		return WeaponDamage;
-	}
-
-	float finalDamage = 0;
-
-
-	UE_LOG(LogTemp, Warning, TEXT("HitedPhysicalMaterial: %s"),*PhysicalMaterial->GetName());
-	switch (PhysicalMaterial->SurfaceType)
-	{
-	    case EPhysicalSurface::SurfaceType1:
-	    {
-			//头部
-			finalDamage = WeaponDamage * 1.2;
-	    }
-	    break;
-		case EPhysicalSurface::SurfaceType2:
-		{
-			//身体
-			finalDamage = WeaponDamage * 1.0;
-		}
-		break;
-	}
-	return finalDamage;
-}
 
 void AWeaponBase::ObjectBulletShoot()
 {
 	//定义弹道模拟将要用到的参数
-	TObjectPtr<APlayerController> PC = Cast<APlayerController>(WeaponOwner->GetController());
-	if (!IsValid(PC.Get())) return;
+	FVector ShootLocation;
+	FRotator ShootRotation;
+	if (IsValid(WeaponOwner))
+	{
+		TObjectPtr<APlayerController> PC = Cast<APlayerController>(WeaponOwner->GetController());
+		if (!IsValid(PC.Get())) return;
 
-	FVector CameraLocation;
-	FRotator CameraRotation;
-	PC->GetPlayerViewPoint(CameraLocation, CameraRotation);
-	FVector CameraDirection = CameraRotation.Vector();//需不需要归一化处理？
+		FVector CameraLocation;
+		FRotator CameraRotation;
+		PC->GetPlayerViewPoint(CameraLocation, CameraRotation);
+		ShootLocation = CameraLocation;
+		ShootRotation = CameraRotation;
+	}
+	else
+	{
+		ShootLocation = GetActorLocation();
+		ShootRotation = GetActorRotation();
+	}
 
 	FHitResult hitResult;
 	hitResult.Init();
@@ -356,11 +401,11 @@ void AWeaponBase::ObjectBulletShoot()
 	TrajectoryPoints.Empty();//先清空弹道轨迹点
 	bool bIsBulletHit = false;
 
-	if (WeaponOwner->bIsAiming)//开镜瞄准
+	if (IsValid(WeaponOwner) && WeaponOwner->bIsAiming)//开镜瞄准
 	{
 		//模拟物理弹道
-		bIsBulletHit = SimulatePhysicsTrajectory(CameraLocation,
-			CameraDirection, BulletInitialSpeed,
+		bIsBulletHit = SimulatePhysicsTrajectory(ShootLocation,
+			ShootRotation.Vector(), BulletInitialSpeed,
 			BulletGravity, BulletMaxLifeTime,
 			BulletRadius, hitResult,
 			TimeToHit, TrajectoryPoints);
@@ -382,20 +427,20 @@ void AWeaponBase::ObjectBulletShoot()
 		//	*HitComponentName, *BoneName, *PhysMatName);
 #pragma endregion
 		//渲染子弹视觉表现，一般来说子弹击中物体的反馈特效由物体来决定，也就是说每个可以被击中的物体都附带有可以供外部调用的特效
-		PlayProjectileLaunch(CameraRotation, TrajectoryPoints, TimeToHit, hitResult, bIsBulletHit);
+		PlayProjectileLaunch(ShootRotation, TrajectoryPoints, TimeToHit, hitResult, bIsBulletHit);
 	}
 	else//腰射
 	{
 		FVector shootdirection;
-		shootdirection = FMath::VRandCone(CameraDirection, WeaponMaxSpreadAngle);//圆锥体内散布
+		shootdirection = FMath::VRandCone(ShootRotation.Vector(), WeaponMaxSpreadAngle);//圆锥体内散布
 		bIsBulletHit = SimulatePhysicsTrajectory(
-			CameraLocation, shootdirection,
+			ShootLocation, shootdirection,
 			BulletInitialSpeed, BulletGravity,
 			BulletMaxLifeTime, BulletRadius,
 			hitResult, TimeToHit, TrajectoryPoints
 		);
 		//渲染子弹视觉表现
-		PlayProjectileLaunch(CameraRotation, TrajectoryPoints, TimeToHit, hitResult, bIsBulletHit);
+		PlayProjectileLaunch(ShootRotation, TrajectoryPoints, TimeToHit, hitResult, bIsBulletHit);
 	}
 }
 
@@ -416,33 +461,41 @@ void AWeaponBase::MassBulletShoot()
 	FMassEntityTemplateID TemplateID = BulletMassConfig->GetConfig().GetOrCreateEntityTemplate(*World).GetTemplateID();
 
 	// 2. 构建初始化数据
-	TObjectPtr<APlayerController> PC = Cast<APlayerController>(WeaponOwner->GetController());
-	check(PC);
-	FVector CameraLocation;
-	FRotator CameraRotation;
-	PC->GetPlayerViewPoint(CameraLocation, CameraRotation);
-	//根据开关镜计算腰射散布角度
-	FVector ShootDirection;
-	if (WeaponOwner->bIsAiming == false)
+	FBulletSpawnData SpawnData;
+	if (IsValid(WeaponOwner))
 	{
-		ShootDirection = FMath::VRandCone(CameraRotation.Vector(), WeaponMaxSpreadAngle);
+		TObjectPtr<APlayerController> PC = Cast<APlayerController>(WeaponOwner->GetController());
+		check(PC);
+		FVector CameraLocation;
+		FRotator CameraRotation;
+		PC->GetPlayerViewPoint(CameraLocation, CameraRotation);
+		//根据开关镜计算腰射散布角度
+		FVector ShootDirection = CalculateShootDirection();
+
+		SpawnData.InstigatorActor = this;
+		SpawnData.CurrentLocation = CameraLocation;
+		SpawnData.Velocity = ShootDirection * BulletInitialSpeed;
+		SpawnData.CollisionRadius = BulletRadius;
+		SpawnData.Gravity = FVector(0, 0, -980) * BulletGravity;
+		SpawnData.RemainingLifeTime = BulletMaxLifeTime;
+		SpawnData.Damage = WeaponDamage;
+		SpawnData.ActorToIgnore = ActorToIgnore;
+		SpawnData.TFLocation = WeaponMesh->GetSocketLocation(TEXT("Muzzle"));
+		SpawnData.TFScale3D = BulletMeshTransformScale;
 	}
 	else
 	{
-		ShootDirection = CameraRotation.Vector();
+		SpawnData.InstigatorActor = WeaponOwner;
+		SpawnData.CurrentLocation = GetActorLocation();
+		SpawnData.Velocity = GetActorRotation().Vector() * BulletInitialSpeed;
+		SpawnData.CollisionRadius = BulletRadius;
+		SpawnData.Gravity = FVector(0, 0, -980) * BulletGravity;
+		SpawnData.RemainingLifeTime = BulletMaxLifeTime;
+		SpawnData.Damage = WeaponDamage;
+		SpawnData.ActorToIgnore = ActorToIgnore;
+		SpawnData.TFLocation = WeaponMesh->GetSocketLocation(TEXT("Muzzle"));
+		SpawnData.TFScale3D = BulletMeshTransformScale;
 	}
-
-	FBulletSpawnData SpawnData;
-	SpawnData.InstigatorActor = WeaponOwner;
-	SpawnData.CurrentLocation = CameraLocation;
-	SpawnData.Velocity = ShootDirection * BulletInitialSpeed;
-	SpawnData.CollisionRadius = BulletRadius;
-	SpawnData.Gravity = FVector(0, 0, -980) * BulletGravity;
-	SpawnData.RemainingLifeTime = BulletMaxLifeTime;
-	SpawnData.Damage = WeaponDamage;
-	SpawnData.ActorToIgnore = ActorToIgnore;
-	SpawnData.TFLocation = WeaponMesh->GetSocketLocation(TEXT("Muzzle"));
-	SpawnData.TFScale3D = BulletMeshTransformScale;
 
 	// 3. 生成实体
 	UMassSpawnerSubsystem* SpawnerSubsystem = UWorld::GetSubsystem<UMassSpawnerSubsystem>(World);
@@ -572,8 +625,10 @@ void AWeaponBase::TryShoot()
 		WeaponOwner->PlayerShootingRecoil();
 	}
 
+	//基于对象池的射击系统
 	//ObjectBulletShoot();
 
+	//基于MassEntity的射击系统
 	MassBulletShoot();
 }
 

@@ -163,6 +163,12 @@ protected:
 	virtual void BeginPlay() override;
 
 	bool ShootValidate();
+	bool AmmoCheck();
+	bool ShootFrequencyValidate();
+
+	float CalculateDamage(TObjectPtr<UPhysicalMaterial> PhysicalMaterial);
+
+	FVector CalculateShootDirection();
 
 	bool SimulatePhysicsTrajectory(
 		const FVector& OriginalPosition, const FVector& Direction,
@@ -173,8 +179,6 @@ protected:
 	void PlayProjectileLaunch(const FRotator& SpawnDirection,
 		const TArray<FVector>& Trajectory, float FLightTime,
 		const FHitResult& HitResult, bool bIsHit);
-
-	float CalculateDamage(TObjectPtr<UPhysicalMaterial> PhysicalMaterial);
 
 	void ObjectBulletShoot();
 
