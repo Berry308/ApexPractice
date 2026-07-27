@@ -23,7 +23,8 @@ public class FirstPersonShoot : ModuleRules
 			"MassSpawner",
 			// Mass 视觉表现 (LOD/StaticMesh 渲染)
 			"MassRepresentation",
-            "MassLOD"
+            "MassLOD",
+			"UnLua"
         });
 	}
 }

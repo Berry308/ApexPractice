@@ -41,6 +41,7 @@ void UBulletHitProcessor::Execute(FMassEntityManager& EntityManager, FMassExecut
                 {
 					//造成伤害，question：如何在造成伤害的同时传递伤害来源和伤害类型等信息？
                     //Target->TakeDamage(Hits[i].Damage, FDamageEvent(), nullptr, nullptr);
+                    //Instigator->CauseDamage();//通知伤害的发起者，自己造成了伤害
 					UE_LOG(LogTemp, Warning, TEXT("BulletHitProcessor: Bullet hit target %s and applied damage."), *Target->GetName());
                 }
 

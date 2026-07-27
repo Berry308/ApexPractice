@@ -32,6 +32,7 @@ void UBulletSimulationProcessor::Execute(FMassEntityManager& EntityManager, FMas
         [this](FMassExecutionContext& IterContext)
         {
             //UE_LOG(LogTemp, Log, TEXT("BulletSimulationProcessor Execute"));
+            
             //控制模拟精度
             bool bChunkNeedUpdate = false;
             const float WorldDeltaTime = IterContext.GetDeltaTimeSeconds();
@@ -71,9 +72,9 @@ void UBulletSimulationProcessor::Execute(FMassEntityManager& EntityManager, FMas
 				//根据当前速度、方向和重力计算子弹的下一个位置
 				FVector Start = Sims[i].CurrentLocation;
 				FVector Velocity = Sims[i].Velocity + Sims[i].Gravity * IterContext.GetDeltaTimeSeconds();//在当前速度基础上叠加重力影响
-                FVector End = Start + (Velocity * IterContext.GetDeltaTimeSeconds());
+                FVector End = Start + (Velocity * (TargetInterval - Timer.TimeAccumulator));
 
-				Sims[i].RemainingLifeTime -= IterContext.GetDeltaTimeSeconds();//减少子弹剩余存活时间
+				Sims[i].RemainingLifeTime -= WorldDeltaTime;//减少子弹剩余存活时间
 				Sims[i].Velocity = Velocity;//更新子弹速度
 				Sims[i].CurrentLocation = End;//更新子弹位置
 

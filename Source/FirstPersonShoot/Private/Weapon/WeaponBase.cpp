@@ -165,7 +165,7 @@ float AWeaponBase::CalculateDamage(TObjectPtr<UPhysicalMaterial> PhysicalMateria
 	case EPhysicalSurface::SurfaceType1:
 	{
 		//头部
-		finalDamage = WeaponDamage * 1.2;
+		finalDamage = WeaponDamage * WeaponHeadShotRatio;
 	}
 	break;
 	case EPhysicalSurface::SurfaceType2:

@@ -51,6 +51,9 @@ public:
 	float WeaponDamage;
 
 	UPROPERTY(EditAnywhere, Category = "WeaponProperty")
+	float WeaponHeadShotRatio = 1.2;
+
+	UPROPERTY(EditAnywhere, Category = "WeaponProperty")
 	TSubclassOf<AProjectileBase> WeaponProjectileClass;
 
 	UPROPERTY(EditAnywhere, Category = "WeaponProperty")
